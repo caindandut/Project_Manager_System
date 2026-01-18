@@ -108,3 +108,5 @@ prisma/migrations/
 # Build outputs
 dist/
 build/
+
+/generated/prisma

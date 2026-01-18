@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model activitylog {
+  id           Int       @id @default(autoincrement())
+  user_id      Int?
+  action       String?   @db.VarChar(255)
+  target_table String?   @db.VarChar(50)
+  target_id    Int?
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  user         user?     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_log_user")
+
+  @@index([user_id], map: "fk_log_user")
+}
+
+model chatgroup {
+  id              Int               @id @default(autoincrement())
+  project_id      Int?
+  group_name      String?           @db.VarChar(255)
+  group_image     String?           @db.VarChar(255)
+  created_at      DateTime?         @default(now()) @db.Timestamp(0)
+  project         project?          @relation(fields: [project_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_chat_project")
+  chatgroupmember chatgroupmember[]
+  message         message[]
+
+  @@index([project_id], map: "fk_chat_project")
+}
+
+model chatgroupmember {
+  chat_group_id Int
+  user_id       Int
+  joined_at     DateTime? @default(now()) @db.Timestamp(0)
+  chatgroup     chatgroup @relation(fields: [chat_group_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cgm_group")
+  user          user      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cgm_user")
+
+  @@id([chat_group_id, user_id])
+  @@index([user_id], map: "fk_cgm_user")
+}
+
+model comment {
+  id         Int       @id @default(autoincrement())
+  task_id    Int?
+  user_id    Int?
+  content    String?   @db.Text
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  task       task?     @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comment_task")
+  user       user?     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_comment_user")
+
+  @@index([task_id], map: "fk_comment_task")
+  @@index([user_id], map: "fk_comment_user")
+}
+
+model company {
+  id           Int       @id @default(autoincrement())
+  company_name String    @db.VarChar(255)
+  logo_path    String?   @db.VarChar(255)
+  field        String?   @db.VarChar(100)
+  scale        String?   @db.VarChar(50)
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  project      project[]
+  user         user[]
+}
+
+model document {
+  id               Int           @id @default(autoincrement())
+  project_id       Int?
+  task_id          Int?
+  parent_folder_id Int?
+  uploader_id      Int?
+  file_name        String        @db.VarChar(255)
+  file_path        String        @db.VarChar(255)
+  type             document_type
+  size_kb          Int?          @default(0)
+  mime_type        String?       @db.VarChar(100)
+  created_at       DateTime?     @default(now()) @db.Timestamp(0)
+  document         document?     @relation("documentTodocument", fields: [parent_folder_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_doc_parent")
+  other_document   document[]    @relation("documentTodocument")
+  project          project?      @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_doc_project")
+  task             task?         @relation(fields: [task_id], references: [id], onUpdate: NoAction, map: "fk_doc_task")
+  user             user?         @relation(fields: [uploader_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_doc_uploader")
+
+  @@index([parent_folder_id], map: "fk_doc_parent")
+  @@index([project_id], map: "fk_doc_project")
+  @@index([uploader_id], map: "fk_doc_uploader")
+  @@index([task_id], map: "idx_doc_task")
+}
+
+model message {
+  id                             Int           @id @default(autoincrement())
+  sender_id                      Int?
+  chat_group_id                  Int?
+  receiver_id                    Int?
+  content                        String?       @db.Text
+  type                           message_type? @default(Text)
+  file_path                      String?       @db.VarChar(255)
+  is_read                        Boolean?      @default(false)
+  sent_at                        DateTime?     @default(now()) @db.Timestamp(0)
+  chatgroup                      chatgroup?    @relation(fields: [chat_group_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_group")
+  user_message_receiver_idTouser user?         @relation("message_receiver_idTouser", fields: [receiver_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_msg_receiver")
+  user_message_sender_idTouser   user?         @relation("message_sender_idTouser", fields: [sender_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_msg_sender")
+
+  @@index([receiver_id], map: "fk_msg_receiver")
+  @@index([sender_id], map: "fk_msg_sender")
+  @@index([chat_group_id], map: "idx_msg_group")
+}
+
+model notification {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  content    String?   @db.Text
+  link_url   String?   @db.VarChar(255)
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  user       user      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_notif_user")
+
+  @@index([user_id, is_read], map: "idx_notif_user")
+}
+
+model project {
+  id            Int             @id @default(autoincrement())
+  company_id    Int?
+  manager_id    Int?
+  project_name  String          @db.VarChar(255)
+  description   String?         @db.Text
+  start_date    DateTime?       @db.Date
+  end_date      DateTime?       @db.Date
+  color_code    String?         @default("#000000") @db.VarChar(7)
+  label         String?         @db.VarChar(100)
+  status        project_status? @default(Active)
+  created_at    DateTime?       @default(now()) @db.Timestamp(0)
+  chatgroup     chatgroup[]
+  document      document[]
+  company       company?        @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_project_company")
+  user          user?           @relation(fields: [manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_project_owner")
+  projectmember projectmember[]
+  taskgroup     taskgroup[]
+
+  @@index([company_id], map: "fk_project_company")
+  @@index([manager_id], map: "fk_project_owner")
+}
+
+model projectmember {
+  project_id Int
+  user_id    Int
+  joined_at  DateTime?           @default(now()) @db.Timestamp(0)
+  role       projectmember_role? @default(Member)
+  project    project             @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pm_project")
+  user       user                @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pm_user")
+
+  @@id([project_id, user_id])
+  @@index([user_id], map: "fk_pm_user")
+  @@index([project_id], map: "idx_pm_project")
+}
+
+model task {
+  id                                                 Int              @id @default(autoincrement())
+  parent_task_id                                     Int?
+  task_group_id                                      Int?
+  creator_id                                         Int?
+  title                                              String           @db.VarChar(255)
+  description                                        String?          @db.Text
+  deadline                                           DateTime?        @db.DateTime(0)
+  priority                                           task_priority?   @default(Medium)
+  status                                             task_status?     @default(Todo)
+  completion_percent                                 Int?             @default(0)
+  position                                           Int?             @default(0)
+  is_archived                                        Boolean?         @default(false)
+  created_at                                         DateTime?        @default(now()) @db.Timestamp(0)
+  updated_at                                         DateTime?        @default(now()) @db.Timestamp(0)
+  comment                                            comment[]
+  document                                           document[]
+  user                                               user?            @relation(fields: [creator_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_task_creator")
+  taskgroup                                          taskgroup?       @relation(fields: [task_group_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_task_group")
+  task                                               task?            @relation("taskTotask", fields: [parent_task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_task_parent")
+  other_task                                         task[]           @relation("taskTotask")
+  taskassignee                                       taskassignee[]
+  taskdependency_taskdependency_predecessor_idTotask taskdependency[] @relation("taskdependency_predecessor_idTotask")
+  taskdependency_taskdependency_successor_idTotask   taskdependency[] @relation("taskdependency_successor_idTotask")
+
+  @@index([creator_id], map: "fk_task_creator")
+  @@index([parent_task_id], map: "fk_task_parent")
+  @@index([task_group_id], map: "idx_task_group")
+}
+
+model taskassignee {
+  task_id Int
+  user_id Int
+  role    taskassignee_role? @default(Main)
+  task    task               @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ta_task")
+  user    user               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ta_user")
+
+  @@id([task_id, user_id])
+  @@index([user_id], map: "fk_ta_user")
+}
+
+model taskdependency {
+  predecessor_id                           Int
+  successor_id                             Int
+  task_taskdependency_predecessor_idTotask task @relation("taskdependency_predecessor_idTotask", fields: [predecessor_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dep_pre")
+  task_taskdependency_successor_idTotask   task @relation("taskdependency_successor_idTotask", fields: [successor_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dep_suc")
+
+  @@id([predecessor_id, successor_id])
+  @@index([successor_id], map: "fk_dep_suc")
+}
+
+model taskgroup {
+  id         Int      @id @default(autoincrement())
+  project_id Int?
+  group_name String   @db.VarChar(255)
+  position   Int?     @default(0)
+  task       task[]
+  project    project? @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_group_project")
+
+  @@index([project_id], map: "fk_group_project")
+}
+
+model user {
+  id                                Int               @id @default(autoincrement())
+  company_id                        Int?
+  full_name                         String            @db.VarChar(255)
+  email                             String            @unique(map: "email")
+  password                          String?           @db.VarChar(255)
+  google_id                         String?           @unique(map: "google_id") @db.VarChar(255)
+  role                              user_role?        @default(Employee)
+  is_online                         Boolean?          @default(false)
+  avatar_path                       String?           @db.VarChar(255)
+  created_at                        DateTime?         @default(now()) @db.Timestamp(0)
+  activitylog                       activitylog[]
+  chatgroupmember                   chatgroupmember[]
+  comment                           comment[]
+  document                          document[]
+  message_message_receiver_idTouser message[]         @relation("message_receiver_idTouser")
+  message_message_sender_idTouser   message[]         @relation("message_sender_idTouser")
+  notification                      notification[]
+  project                           project[]
+  projectmember                     projectmember[]
+  task                              task[]
+  taskassignee                      taskassignee[]
+  company                           company?          @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_company")
+
+  @@index([company_id], map: "fk_user_company")
+  @@index([email], map: "idx_user_email")
+}
+
+enum taskassignee_role {
+  Main
+  Support
+}
+
+enum projectmember_role {
+  Manager
+  Member
+  Viewer
+}
+
+enum message_type {
+  Text
+  Image
+  File
+}
+
+enum user_role {
+  Admin
+  Director
+  Employee
+}
+
+enum task_priority {
+  Low
+  Medium
+  High
+  Urgent
+}
+
+enum document_type {
+  Folder
+  File
+}
+
+enum task_status {
+  Todo
+  InProgress
+  Review
+  Completed
+  Overdue
+}
+
+enum project_status {
+  Active
+  Completed
+  Archived
+}
