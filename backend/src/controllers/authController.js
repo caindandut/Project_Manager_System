@@ -2,6 +2,8 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 const generateToken = require('../utils/generateToken');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -126,4 +128,81 @@ const loginGoogle = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, loginGoogle };
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ message: 'Email không tồn tại' });
+
+    const resetToken = crypto.randomBytes(20).toString('hex');
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        resetPasswordToken: resetToken,
+        resetPasswordExpires: new Date(Date.now() + 3600000),
+      },
+    });
+
+    const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: '[ProjectManager] Đặt lại mật khẩu',
+      html: `<p>Bạn đã yêu cầu đặt lại mật khẩu.</p>
+             <p>Click vào link này để tiếp tục: <a href="${resetUrl}">${resetUrl}</a></p>
+             <p>Link hết hạn sau 1 giờ.</p>`,
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.json({ message: 'Email đã được gửi thành công!' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Lỗi gửi email' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) return res.status(400).json({ message: 'Token lỗi hoặc đã hết hạn' });
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+      },
+    });
+
+    res.json({ message: 'Đổi mật khẩu thành công!' });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi Server' });
+  }
+};
+
+module.exports = { registerUser, loginUser, loginGoogle, forgotPassword, resetPassword };

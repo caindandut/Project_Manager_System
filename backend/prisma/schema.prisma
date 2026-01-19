@@ -226,6 +226,8 @@ model user {
   full_name                         String            @db.VarChar(255)
   email                             String            @unique(map: "email")
   password                          String?           @db.VarChar(255)
+  resetPasswordToken                String?   
+  resetPasswordExpires              DateTime? 
   google_id                         String?           @unique(map: "google_id") @db.VarChar(255)
   role                              user_role?        @default(Employee)
   is_online                         Boolean?          @default(false)
