@@ -205,4 +205,8 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, loginGoogle, forgotPassword, resetPassword };
+const getMe = async (req, res) => {
+  res.json(req.user);
+};
+
+module.exports = { registerUser, loginUser, loginGoogle, forgotPassword, resetPassword, getMe };
