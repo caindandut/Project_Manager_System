@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -5,6 +6,10 @@ import { ArrowLeft, LayoutGrid } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const ForgotPasswordPage = () => {
+  useEffect(() => {
+    document.title = "Khôi phục mật khẩu";
+  }, []);
+
   return (
     <div className="w-full h-screen flex justify-center items-center bg-white">
       <div className="w-full flex flex-col justify-center items-center px-8 md:px-16 lg:px-24">

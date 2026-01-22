@@ -1,8 +1,13 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const NotFoundPage = () => {
+  useEffect(() => {
+    document.title = "404 - Không tìm thấy trang";
+  }, []);
+
   return (
     <div className="w-full h-screen flex justify-center items-center bg-white">
       <div className="w-full flex flex-col justify-center items-center px-8 md:px-16 lg:px-24">
