@@ -66,7 +66,7 @@ const loginUser = async (req, res) => {
         token: generateToken(user.id),
       });
     } else {
-      res.status(401).json({ message: 'Sai email hoặc mật khẩu' });
+      res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
     }
   } catch (error) {
     res.status(500).json({ message: 'Lỗi Server' });

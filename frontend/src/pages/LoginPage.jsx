@@ -3,11 +3,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, LayoutGrid } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Eye, EyeOff, LayoutGrid, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    try {
+      await login(email, password);
+      navigate("/dashboard");
+    } catch (error) {
+      setError(error.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     document.title = "Đăng nhập";
@@ -34,13 +57,22 @@ const LoginPage = () => {
             </p>
           </div>
 
-          <form className="space-y-6">
+          {error && (
+                <div className="bg-red-50 text-red-600 p-3 rounded text-sm text-center">
+                    {error}
+                </div>
+            )}
+
+          <form className="space-y-6" onSubmit={handleLogin}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input 
                 id="email" 
                 type="email" 
                 className="h-11"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
               />
             </div>
 
@@ -51,6 +83,9 @@ const LoginPage = () => {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   className="h-11 pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
                 <button
                   type="button"
@@ -70,8 +105,17 @@ const LoginPage = () => {
               </div>
             </div>
 
-            <Button className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-base">
-              Đăng nhập
+            <Button 
+                type="submit" 
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-base"
+                disabled={isLoading}
+            >
+              {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                    Đang xử lý...
+                  </>
+              ) : "Đăng nhập"}
             </Button>
           </form>
 
