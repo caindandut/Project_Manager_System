@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
 import LoginPage from '@/pages/LoginPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import NotFoundPage from '@/pages/NotFoundPage';
@@ -15,15 +16,15 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           <Route path="/login" element={
-            <ProtectedRoute>
+            <PublicRoute>
               <LoginPage />
-            </ProtectedRoute>
+            </PublicRoute>
           } />
 
           <Route path="/forgot-password" element={
-            <ProtectedRoute>
+            <PublicRoute>
               <ForgotPasswordPage />
-            </ProtectedRoute>
+            </PublicRoute>
           } />
 
           <Route
@@ -35,13 +36,8 @@ function App() {
             }
           />
 
-          <Route path="*" element={
-            <ProtectedRoute>
-              <NotFoundPage />
-            </ProtectedRoute>
-          }
-          />
-          
+          <Route path="*" element={<NotFoundPage />} />
+
         </Routes>
       </BrowserRouter>
     </AuthProvider>
