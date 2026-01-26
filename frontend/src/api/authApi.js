@@ -1,20 +1,11 @@
 import axiosClient from "./axiosClient";
 
 const authApi = {
-  login: (params) => {
-    const url = '/auth/login';
-    return axiosClient.post(url, params);
-  },
-
-  getMe: () => {
-    const url = '/auth/me';
-    return axiosClient.get(url);
-  },
-
-  loginGoogle: (params) => {
-    const url = '/auth/google';
-    return axiosClient.post(url, params);
-  }
+  login: (params) => axiosClient.post('/auth/login', params),
+  getMe: () => axiosClient.get('/auth/me'),
+  loginGoogle: (params) => axiosClient.post('/auth/google', params),
+  forgotPassword: (email) => axiosClient.post('/auth/forgot-password', { email }),
+  resetPassword: (token, password) => axiosClient.post(`/auth/reset-password/${token}`, { password })
 };
 
 export default authApi;
