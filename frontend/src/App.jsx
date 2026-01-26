@@ -6,6 +6,7 @@ import LoginPage from '@/pages/LoginPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import DashboardPage from '@/pages/DashboardPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 
 
 function App() {
@@ -24,6 +25,12 @@ function App() {
           <Route path="/forgot-password" element={
             <PublicRoute>
               <ForgotPasswordPage />
+            </PublicRoute>
+          } />
+
+          <Route path="/reset-password/:token" element={
+            <PublicRoute>
+              <ResetPasswordPage />
             </PublicRoute>
           } />
 

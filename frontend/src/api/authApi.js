@@ -5,7 +5,8 @@ const authApi = {
   getMe: () => axiosClient.get('/auth/me'),
   loginGoogle: (params) => axiosClient.post('/auth/google', params),
   forgotPassword: (email) => axiosClient.post('/auth/forgot-password', { email }),
-  resetPassword: (token, password) => axiosClient.post(`/auth/reset-password/${token}`, { password })
+  verifyResetToken: (token) => axiosClient.get(`/auth/verify-reset-token/${token}`),
+  resetPassword: (token, password) => axiosClient.post(`/auth/reset-password/${token}`, { password }),
 };
 
 export default authApi;

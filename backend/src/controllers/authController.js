@@ -236,8 +236,44 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const verifyResetToken = async (req, res) => {
+  const { token } = req.params;
+
+  try {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: { gt: new Date() },
+      },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        valid: false,
+        message: 'Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.',
+      });
+    }
+
+    return res.json({ valid: true });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ valid: false, message: 'Lỗi Server' });
+  }
+};
+
 const getMe = async (req, res) => {
   res.json(req.user);
 };
 
-module.exports = { registerUser, loginUser, loginGoogle, forgotPassword, resetPassword, getMe };
+module.exports = {
+  registerUser,
+  loginUser,
+  loginGoogle,
+  forgotPassword,
+  resetPassword,
+  verifyResetToken,
+  getMe,
+};
