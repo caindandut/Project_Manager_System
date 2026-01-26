@@ -49,15 +49,15 @@ const ResetPasswordPage = () => {
     if (!isPasswordValid) {
       const errors = [];
       if (!hasMinLength) {
-        errors.push("Mật khẩu phải có tối thiểu 8 ký tự");
+        errors.push("tối thiểu 8 ký tự");
       }
       if (!hasUpperCase) {
-        errors.push("Mật khẩu phải có chữ in hoa");
+        errors.push("chữ in hoa");
       }
       if (!hasSpecialChar) {
-        errors.push("Mật khẩu phải có ký tự đặc biệt");
+        errors.push("ký tự đặc biệt");
       }
-      setError(errors.join(", "));
+      setError("Mật khẩu phải có: " + errors.join(", "));
       return;
     }
 

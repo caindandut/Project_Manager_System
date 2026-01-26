@@ -215,7 +215,7 @@ const resetPassword = async (req, res) => {
       },
     });
 
-    if (!user) return res.status(400).json({ message: 'Token lỗi hoặc đã hết hạn' });
+    if (!user) return res.status(400).json({ message: 'Link không hợp lệ hoặc đã hết hạn' });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);

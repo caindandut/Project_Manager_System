@@ -33,7 +33,7 @@ const ForgotPasswordPage = () => {
   return (
     <div className="w-full h-screen flex justify-center items-center bg-white">
       <div className="w-full flex flex-col justify-center items-center px-8 md:px-16 lg:px-24">
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full max-w-md space-y-8 bg-white rounded-xl shadow-lg p-8">
            <div className="flex justify-center mb-4">
               <img 
                 src="https://share-gcdn.basecdn.net/brand/logo.full.png" 
