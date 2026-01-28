@@ -1,10 +1,17 @@
-const notFound = (req, res, next) => {
+import { Request, Response, NextFunction } from 'express';
+
+export const notFound = (req: Request, res: Response, next: NextFunction): void => {
     const error = new Error(`Không tìm thấy đường dẫn - ${req.originalUrl}`);
     res.status(404);
     next(error);
 };
 
-const errorHandler = (err, req, res, next) => {
+export const errorHandler = (
+    err: any,
+    _req: Request,
+    res: Response,
+    _next: NextFunction
+): void => {
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
 
     res.status(statusCode);
@@ -13,5 +20,3 @@ const errorHandler = (err, req, res, next) => {
         stack: process.env.NODE_ENV === 'production' ? null : err.stack,
     });
 };
-
-module.exports = { notFound, errorHandler };

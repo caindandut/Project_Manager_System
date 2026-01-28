@@ -1,16 +1,22 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
-const { OAuth2Client } = require('google-auth-library');
-const generateToken = require('../utils/generateToken');
-const nodemailer = require('nodemailer');
-const crypto = require('crypto');
+import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
+import generateToken from '../utils/generateToken';
+import nodemailer from 'nodemailer';
+import * as crypto from 'crypto';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID as string);
 
-
-const registerUser = async (req, res) => {
+export const registerUser = async (req: Request, res: Response): Promise<void> => {
   const { full_name, email, password } = req.body;
 
   try {
@@ -19,7 +25,8 @@ const registerUser = async (req, res) => {
     });
 
     if (userExists) {
-      return res.status(400).json({ message: 'Email này đã được sử dụng' });
+      res.status(400).json({ message: 'Email này đã được sử dụng' });
+      return;
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -49,7 +56,7 @@ const registerUser = async (req, res) => {
   }
 };
 
-const loginUser = async (req, res) => {
+export const loginUser = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
 
   try {
@@ -57,7 +64,7 @@ const loginUser = async (req, res) => {
       where: { email },
     });
 
-    if (user && (await bcrypt.compare(password, user.password))) {
+    if (user && user.password && (await bcrypt.compare(password, user.password))) {
       res.json({
         id: user.id,
         full_name: user.full_name,
@@ -73,16 +80,27 @@ const loginUser = async (req, res) => {
   }
 };
 
-const loginGoogle = async (req, res) => {
-  const { token } = req.body; 
+export const loginGoogle = async (req: Request, res: Response): Promise<void> => {
+  const { token } = req.body;
 
   try {
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID as string,
     });
-    
-    const { email, name, picture, sub } = ticket.getPayload(); 
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      res.status(400).json({ message: 'Token Google không hợp lệ' });
+      return;
+    }
+
+    const { email, name, picture, sub } = payload;
+
+    if (!email || !name || !sub) {
+      res.status(400).json({ message: 'Thông tin Google không đầy đủ' });
+      return;
+    }
 
     let user = await prisma.user.findUnique({
       where: { email },
@@ -93,7 +111,7 @@ const loginGoogle = async (req, res) => {
         where: { id: user.id },
         data: {
           google_id: sub,
-          avatar_path: picture,
+          avatar_path: picture || null,
         },
       });
     } else {
@@ -105,9 +123,9 @@ const loginGoogle = async (req, res) => {
         data: {
           full_name: name,
           email: email,
-          password: hashedPassword, 
+          password: hashedPassword,
           google_id: sub,
-          avatar_path: picture,
+          avatar_path: picture || null,
           role: 'Employee',
         },
       });
@@ -121,36 +139,29 @@ const loginGoogle = async (req, res) => {
       avatar: user.avatar_path,
       token: generateToken(user.id),
     });
-
   } catch (error) {
     console.error(error);
     res.status(400).json({ message: 'Token Google không hợp lệ' });
   }
 };
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-const forgotPassword = async (req, res) => {
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
   const { email } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ message: 'Email không tồn tại' });
+    if (!user) {
+      res.status(404).json({ message: 'Email không tồn tại' });
+      return;
+    }
 
     const resetToken = crypto.randomBytes(20).toString('hex');
-    
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
 
     await prisma.user.update({
       where: { email },
       data: {
         resetPasswordToken: hashedToken,
-        resetPasswordExpires: new Date(Date.now() + 15 * 60 * 1000), 
+        resetPasswordExpires: new Date(Date.now() + 15 * 60 * 1000),
       },
     });
 
@@ -194,19 +205,18 @@ const forgotPassword = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Email đã được gửi thành công!' });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Lỗi gửi email' });
   }
 };
 
-const resetPassword = async (req, res) => {
-  const { token } = req.params;
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
   const { password } = req.body;
 
   try {
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = crypto.createHash('sha256').update(token as string).digest('hex');
 
     const user = await prisma.user.findFirst({
       where: {
@@ -215,7 +225,10 @@ const resetPassword = async (req, res) => {
       },
     });
 
-    if (!user) return res.status(400).json({ message: 'Link không hợp lệ hoặc đã hết hạn' });
+    if (!user) {
+      res.status(400).json({ message: 'Link không hợp lệ hoặc đã hết hạn' });
+      return;
+    }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -230,17 +243,16 @@ const resetPassword = async (req, res) => {
     });
 
     res.json({ message: 'Đổi mật khẩu thành công!' });
-
   } catch (error) {
     res.status(500).json({ message: 'Lỗi Server' });
   }
 };
 
-const verifyResetToken = async (req, res) => {
-  const { token } = req.params;
+export const verifyResetToken = async (req: Request, res: Response): Promise<void> => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
 
   try {
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = crypto.createHash('sha256').update(token as string).digest('hex');
 
     const user = await prisma.user.findFirst({
       where: {
@@ -251,29 +263,20 @@ const verifyResetToken = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({
+      res.status(400).json({
         valid: false,
         message: 'Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.',
       });
+      return;
     }
 
-    return res.json({ valid: true });
+    res.json({ valid: true });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ valid: false, message: 'Lỗi Server' });
+    res.status(500).json({ valid: false, message: 'Lỗi Server' });
   }
 };
 
-const getMe = async (req, res) => {
+export const getMe = async (req: Request, res: Response): Promise<void> => {
   res.json(req.user);
-};
-
-module.exports = {
-  registerUser,
-  loginUser,
-  loginGoogle,
-  forgotPassword,
-  resetPassword,
-  verifyResetToken,
-  getMe,
 };
