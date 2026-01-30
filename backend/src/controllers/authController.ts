@@ -22,8 +22,15 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
         const { email, password, full_name } = req.body; 
         
         const result = await authService.register(email, password, full_name);
-        
-        res.status(201).json(result);
+
+        res.status(201).json({
+          id: result.user.id,
+          full_name: result.user.fullName,
+          email: result.user.email,
+          role: result.user.role,
+          avatar: result.user.avatarPath,
+          token: result.token,
+        });
     } catch (error) {
         next(error); 
     }
@@ -35,7 +42,14 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
 
         const result = await authService.login(email, password);
 
-        res.json(result);
+        res.json({
+          id: result.user.id,
+          full_name: result.user.fullName,
+          email: result.user.email,
+          role: result.user.role,
+          avatar: result.user.avatarPath,
+          token: result.token,
+        });
     } catch (error) {
         res.status(401); 
         next(error);
@@ -43,7 +57,15 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
 };
 
 export const getMe = async (req: Request | any, res: Response): Promise<void> => {
-    res.json(req.user);
+  const { id, email, fullName, role, avatarPath } = req.user || {};
+
+  res.json({
+    id,
+    email,
+    full_name: fullName,
+    role,
+    avatar: avatarPath,
+  });
 };
 
 export const loginGoogle = async (_: Request, res: Response): Promise<void> => {
