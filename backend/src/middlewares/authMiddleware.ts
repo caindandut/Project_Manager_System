@@ -1,69 +1,42 @@
-import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../lib/prisma';
+import jwt from 'jsonwebtoken';
+import { PrismaUserRepository } from '../infrastructure/repositories/PrismaUserRepository';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: number;
-        full_name: string;
-        email: string;
-        role: string;
-        avatar_path: string | null;
-      };
-    }
-  }
+interface DecodedToken {
+  id: number;
 }
 
-export const protect = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  let token: string | undefined;
+const userRepository = new PrismaUserRepository();
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
+export const protect = async (req: Request | any, res: Response, next: NextFunction) => {
+  let token;
+
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as DecodedToken;
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: number };
+      const userEntity = await userRepository.findById(decoded.id);
 
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-        select: {
-          id: true,
-          full_name: true,
-          email: true,
-          role: true,
-          avatar_path: true,
-        },
-      });
-
-      if (!user) {
-        res.status(401).json({ message: 'Token hợp lệ nhưng User không tồn tại' });
-        return;
+      if (!userEntity) {
+        res.status(401);
+        throw new Error('Token hợp lệ nhưng User không tồn tại');
       }
 
       req.user = {
-        id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-        role: user.role ? String(user.role) : 'Employee',
-        avatar_path: user.avatar_path,
+        id: userEntity.id,
+        email: userEntity.email,
+        fullName: userEntity.fullName,
+        role: userEntity.role,
+        avatarPath: userEntity.avatarPath
       };
 
       next();
     } catch (error) {
       console.error(error);
       res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn' });
-      return;
     }
   } else {
     res.status(401).json({ message: 'Không có quyền truy cập, vui lòng gửi Token' });
-    return;
   }
 };
