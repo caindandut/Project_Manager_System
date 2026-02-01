@@ -68,8 +68,32 @@ export const getMe = async (req: Request | any, res: Response): Promise<void> =>
   });
 };
 
-export const loginGoogle = async (_: Request, res: Response): Promise<void> => {
-  res.status(501).json({ message: 'Chức năng đăng nhập Google chưa được triển khai' });
+export const loginGoogle = async (req: Request, res: Response): Promise<void> => {
+  const rawToken = req.body.token ?? req.body.credential;
+  const idToken = typeof rawToken === 'string' ? rawToken : null;
+
+  try {
+    if (!idToken) {
+      res.status(400).json({ message: 'Thiếu token Google' });
+      return;
+    }
+
+    const result = await authService.loginGoogle(idToken);
+
+    res.json({
+      id: result.user.id,
+      full_name: result.user.fullName,
+      email: result.user.email,
+      role: result.user.role,
+      avatar: result.user.avatarPath ?? null,
+      token: result.token,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({
+      message: error instanceof Error ? error.message : 'Token Google không hợp lệ',
+    });
+  }
 };
 
 export const forgotPassword = async (req: Request, res: Response): Promise<void> => {

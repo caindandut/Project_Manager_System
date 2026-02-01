@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, LayoutGrid, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/context/AuthContext";
 
 const LoginPage = () => {
@@ -14,7 +15,7 @@ const LoginPage = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login } = useAuth();
+  const { login, loginGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -31,6 +32,19 @@ const LoginPage = () => {
       setIsLoading(false);
     }
   }
+
+  const handleLoginGoogle = async (credentialResponse) => {
+    setError("");
+    setIsLoading(true);
+    try {
+      await loginGoogle(credentialResponse.credential);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.response?.data?.message || "Đăng nhập Google thất bại.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     document.title = "Đăng nhập";
@@ -128,14 +142,18 @@ const LoginPage = () => {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full h-11 gap-2 text-slate-700 font-medium">
-            <img 
-                src="https://www.svgrepo.com/show/475656/google-color.svg" 
-                alt="Google" 
-                className="w-5 h-5" 
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleLoginGoogle}
+              onError={() => setError("Đăng nhập Google thất bại.")}
+              theme="outline"
+              size="large"
+              text="continue_with"
+              shape="rectangular"
+              width="100%"
+              locale="vi"
             />
-            Đăng nhập bằng Google
-          </Button>
+          </div>
         </div>
       </div>
     </div>

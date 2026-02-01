@@ -38,9 +38,20 @@ export class PrismaUserRepository implements IUserRepository {
                 full_name: user.fullName,
                 password: user.password.value,
                 role: user.role,
-                avatar_path: user.avatarPath
-            }
+                avatar_path: user.avatarPath ?? undefined,
+                google_id: user.googleId ?? undefined,
+            },
         });
         return this.toDomain(savedUser);
+    }
+
+    async updateGoogleProfile(userId: number, googleId: string, avatarPath: string | null): Promise<void> {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                google_id: googleId,
+                avatar_path: avatarPath,
+            },
+        });
     }
 }
