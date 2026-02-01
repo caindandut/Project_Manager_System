@@ -31,6 +31,12 @@ export class PrismaUserRepository implements IUserRepository {
         return this.toDomain(user);
     }
 
+    async findByGoogleId(googleId: string): Promise<User | null> {
+        const user = await prisma.user.findUnique({ where: { google_id: googleId } });
+        if (!user) return null;
+        return this.toDomain(user);
+    }
+
     async save(user: User): Promise<User> {
         const savedUser = await prisma.user.create({
             data: {
@@ -50,6 +56,17 @@ export class PrismaUserRepository implements IUserRepository {
             where: { id: userId },
             data: {
                 google_id: googleId,
+                avatar_path: avatarPath,
+            },
+        });
+    }
+
+    async updateUserProfile(userId: number, email: string, fullName: string, avatarPath: string | null): Promise<void> {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                email,
+                full_name: fullName,
                 avatar_path: avatarPath,
             },
         });

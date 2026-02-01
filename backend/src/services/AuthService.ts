@@ -101,18 +101,26 @@ export class AuthService {
             if (!updated) throw new Error('Lỗi Server');
             user = updated;
         } else {
-            const randomPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
-            const password = await Password.create(randomPassword);
-            const newUser = new User({
-                id: 0,
-                email,
-                fullName: name,
-                password,
-                role: UserRole.EMPLOYEE,
-                avatarPath: picture ?? null,
-                googleId: sub,
-            });
-            user = await this.userRepository.save(newUser);
+            user = await this.userRepository.findByGoogleId(sub);
+            if (user) {
+                await this.userRepository.updateUserProfile(user.id, email, name, picture ?? null);
+                const updated = await this.userRepository.findById(user.id);
+                if (!updated) throw new Error('Lỗi Server');
+                user = updated;
+            } else {
+                const randomPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
+                const password = await Password.create(randomPassword);
+                const newUser = new User({
+                    id: 0,
+                    email,
+                    fullName: name,
+                    password,
+                    role: UserRole.EMPLOYEE,
+                    avatarPath: picture ?? null,
+                    googleId: sub,
+                });
+                user = await this.userRepository.save(newUser);
+            }
         }
 
         const token = generateToken(user.id);
