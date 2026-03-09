@@ -2,6 +2,7 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 import { notFound, errorHandler } from './middlewares/errorMiddleware';
 
 dotenv.config();
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/', (_req: Request, res: Response): void => {
     res.send('API is running...');
