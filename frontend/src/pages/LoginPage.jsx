@@ -40,7 +40,8 @@ const LoginPage = () => {
       await loginGoogle(credentialResponse.credential);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Đăng nhập Google thất bại.");
+      const msg = err.response?.data?.message ?? err.message ?? "Đăng nhập Google thất bại.";
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

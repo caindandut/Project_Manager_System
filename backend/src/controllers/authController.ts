@@ -32,7 +32,8 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
           token: result.token,
         });
     } catch (error) {
-        next(error); 
+        res.status(403);
+        next(error);
     }
 };
 
@@ -51,7 +52,12 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
           token: result.token,
         });
     } catch (error) {
-        res.status(401); 
+        const message = error instanceof Error ? error.message : '';
+        const isForbidden =
+            message.includes('Tài khoản chưa được cấp') ||
+            message.includes('hoàn tất thiết lập tài khoản') ||
+            message.includes('Tài khoản đã bị khóa');
+        res.status(isForbidden ? 403 : 401);
         next(error);
     }
 };
@@ -90,9 +96,10 @@ export const loginGoogle = async (req: Request, res: Response): Promise<void> =>
     });
   } catch (error) {
     console.error(error);
-    res.status(400).json({
-      message: error instanceof Error ? error.message : 'Token Google không hợp lệ',
-    });
+    const message = error instanceof Error ? error.message : 'Token Google không hợp lệ';
+    const isForbidden =
+      message.includes('Tài khoản chưa được cấp') || message.includes('Tài khoản đã bị khóa');
+    res.status(isForbidden ? 403 : 400).json({ message });
   }
 };
 

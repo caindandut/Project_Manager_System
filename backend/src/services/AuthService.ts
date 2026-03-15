@@ -1,9 +1,7 @@
 import { OAuth2Client } from 'google-auth-library';
-import { User, UserRole } from '../domain/entities/User';
-import { Password } from '../domain/value-objects/Password';
 import { IUserRepository } from '../domain/entities/repositories/IUserRepository';
 import generateToken from '../utils/generateToken';
-
+import { prisma } from '../lib/prisma';
 
 interface AuthResponse {
     user: {
@@ -23,42 +21,27 @@ export class AuthService {
         this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     }
 
-    async register(email: string, passwordRaw: string, fullName: string): Promise<AuthResponse> {
-        const existingUser = await this.userRepository.findByEmail(email);
-        if (existingUser) {
-            throw new Error('Email này đã được sử dụng');
-        }
-
-        const password = await Password.create(passwordRaw);
-
-        const newUser = new User({
-            id: 0,
-            email,
-            fullName,
-            password,
-            role: 'Employee' as any,
-        });
-
-        const savedUser = await this.userRepository.save(newUser);
-
-        const token = generateToken(savedUser.id);
-
-        return {
-            user: {
-                id: savedUser.id,
-                email: savedUser.email,
-                fullName: savedUser.fullName,
-                role: savedUser.role,
-                avatarPath: savedUser.avatarPath
-            },
-            token
-        };
+    async register(_email: string, _passwordRaw: string, _fullName: string): Promise<AuthResponse> {
+        throw new Error(
+            'Đăng ký tự do đã bị tắt. Chỉ quản trị viên mới có thể thêm thành viên. Vui lòng sử dụng link mời trong email để tạo tài khoản.'
+        );
     }
 
     async login(email: string, passwordRaw: string): Promise<AuthResponse> {
         const user = await this.userRepository.findByEmail(email);
         if (!user) {
-            throw new Error('Email hoặc mật khẩu không đúng');
+            throw new Error('Tài khoản chưa được cấp. Vui lòng liên hệ quản trị viên để nhận lời mời tham gia hệ thống.');
+        }
+
+        const rawUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { status: true },
+        });
+        if (rawUser?.status === 'Pending') {
+            throw new Error('Vui lòng hoàn tất thiết lập tài khoản qua link trong email mời trước khi đăng nhập.');
+        }
+        if (rawUser?.status === 'Inactive') {
+            throw new Error('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.');
         }
 
         const isValid = await user.password.compare(passwordRaw);
@@ -81,45 +64,79 @@ export class AuthService {
     }
 
     async loginGoogle(idToken: string): Promise<AuthResponse> {
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        if (!clientId) {
+            throw new Error('Cấu hình Google OAuth chưa đúng. Vui lòng liên hệ quản trị viên.');
+        }
         const ticket = await this.googleClient.verifyIdToken({
             idToken,
-            audience: process.env.GOOGLE_CLIENT_ID as string,
+            audience: clientId,
         });
 
         const payload = ticket.getPayload();
-        if (!payload?.email || !payload.name || !payload.sub) {
+        if (!payload?.email || !payload.sub) {
             throw new Error('Token Google không hợp lệ');
         }
 
-        const { email, name, picture, sub } = payload;
+        const email = payload.email;
+        const name = payload.name ?? email.split('@')[0] ?? 'User';
+        const picture = payload.picture ?? null;
+        const sub = payload.sub;
 
         let user = await this.userRepository.findByEmail(email);
 
         if (user) {
-            await this.userRepository.updateGoogleProfile(user.id, sub, picture ?? null);
+            const rawUser = await prisma.user.findUnique({
+                where: { id: user.id },
+                select: { status: true },
+            });
+            if (rawUser?.status === 'Inactive') {
+                throw new Error('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.');
+            }
+            await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    avatar_path: picture ?? user.avatarPath ?? null,
+                    google_id: sub,
+                    authProvider: 'google',
+                    status: 'Active',
+                    inviteToken: null,
+                    inviteExpires: null,
+                },
+            });
             const updated = await this.userRepository.findById(user.id);
             if (!updated) throw new Error('Lỗi Server');
             user = updated;
         } else {
             user = await this.userRepository.findByGoogleId(sub);
             if (user) {
-                await this.userRepository.updateUserProfile(user.id, email, name, picture ?? null);
+                const rawUser = await prisma.user.findUnique({
+                    where: { id: user.id },
+                    select: { status: true },
+                });
+                if (rawUser?.status === 'Inactive') {
+                    throw new Error('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.');
+                }
+                await prisma.user.update({
+                    where: { id: user.id },
+                    data: {
+                        email,
+                        full_name: name,
+                        avatar_path: picture ?? null,
+                        authProvider: 'google',
+                        status: 'Active',
+                        inviteToken: null,
+                        inviteExpires: null,
+                    },
+                });
                 const updated = await this.userRepository.findById(user.id);
                 if (!updated) throw new Error('Lỗi Server');
                 user = updated;
             } else {
-                const randomPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
-                const password = await Password.create(randomPassword);
-                const newUser = new User({
-                    id: 0,
-                    email,
-                    fullName: name,
-                    password,
-                    role: UserRole.EMPLOYEE,
-                    avatarPath: picture ?? null,
-                    googleId: sub,
-                });
-                user = await this.userRepository.save(newUser);
+                // Chỉ cho phép đăng nhập Google nếu email đã được Admin mời (có trong hệ thống)
+                throw new Error(
+                    'Tài khoản chưa được cấp. Vui lòng liên hệ quản trị viên để nhận lời mời tham gia hệ thống.'
+                );
             }
         }
 

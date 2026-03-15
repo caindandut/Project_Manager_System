@@ -6,7 +6,9 @@ import LoginPage from '@/pages/LoginPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import DashboardPage from '@/pages/DashboardPage';
+import MembersPage from '@/pages/MembersPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import AcceptInvitePage from '@/pages/AcceptInvitePage';
 
 
 function App() {
@@ -34,11 +36,23 @@ function App() {
             </PublicRoute>
           } />
 
+          {/* Trang accept-invite cần luôn truy cập được, kể cả khi đang đăng nhập */}
+          <Route path="/accept-invite" element={<AcceptInvitePage />} />
+
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/members"
+            element={
+              <ProtectedRoute allowedRoles={["Admin"]}>
+                <MembersPage />
               </ProtectedRoute>
             }
           />
