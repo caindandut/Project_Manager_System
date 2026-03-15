@@ -19,7 +19,6 @@ const NAV_BY_ROLE = {
   Admin: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
-      // Chưa có trang /projects ở GĐ0 → tạm thời disable để tránh 404
       { label: "Dự án", icon: FolderKanban, href: "/projects", disabled: true },
       { label: "Thành viên", icon: Users, href: "/members" },
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
