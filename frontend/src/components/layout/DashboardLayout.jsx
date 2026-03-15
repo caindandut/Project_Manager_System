@@ -19,7 +19,8 @@ const NAV_BY_ROLE = {
   Admin: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Dự án", icon: FolderKanban, href: "/projects" },
+      // Chưa có trang /projects ở GĐ0 → tạm thời disable để tránh 404
+      { label: "Dự án", icon: FolderKanban, href: "/projects", disabled: true },
       { label: "Thành viên", icon: Users, href: "/members" },
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
     ],
@@ -30,8 +31,8 @@ const NAV_BY_ROLE = {
   Director: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Dự án", icon: FolderKanban, href: "/projects" },
-      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
+      { label: "Dự án", icon: FolderKanban, href: "/projects", disabled: true },
+      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks", disabled: true },
       { label: "Thành viên", icon: Users, href: "/members" },
     ],
     system: [
@@ -41,8 +42,8 @@ const NAV_BY_ROLE = {
   Employee: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Dự án", icon: FolderKanban, href: "/projects" },
-      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
+      { label: "Dự án", icon: FolderKanban, href: "/projects", disabled: true },
+      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks", disabled: true },
     ],
     system: [
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
@@ -72,19 +73,44 @@ function UserAvatar({ name, size = "h-9 w-9 text-sm" }) {
   );
 }
 
-function NavItem({ icon: Icon, label, href, badge, active, onNavigate }) {
+function NavItem({ icon: Icon, label, href, badge, active, disabled, onNavigate }) {
+  const baseClasses =
+    "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors";
+  const enabledClasses = active
+    ? "bg-blue-600 text-white"
+    : "text-slate-300 hover:bg:white/10 hover:text-white";
+  const disabledClasses = "text-slate-500/60 cursor-not-allowed";
+
+  const handleClick = (e) => {
+    if (disabled) {
+      e.preventDefault();
+      return;
+    }
+    onNavigate?.();
+  };
+
   return (
     <Link
       to={href}
-      onClick={onNavigate}
-      className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-        active
-          ? "bg-blue-600 text-white"
-          : "text-slate-300 hover:bg-white/10 hover:text-white"
-      }`}
+      onClick={handleClick}
+      className={`${baseClasses} ${disabled ? disabledClasses : enabledClasses}`}
+      aria-disabled={disabled ? "true" : "false"}
     >
-      <Icon className={`h-5 w-5 shrink-0 ${active ? "text-white" : "text-slate-400 group-hover:text-white"}`} />
-      <span className="flex-1 text-left">{label}</span>
+      <Icon
+        className={`h-5 w-5 shrink-0 ${
+          active && !disabled
+            ? "text-white"
+            : "text-slate-400 group-hover:text-white"
+        }`}
+      />
+      <span className="flex-1 text-left">
+        {label}
+        {disabled && (
+          <span className="ml-2 inline-flex items-center rounded-full bg-slate-700 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">
+            Sắp ra mắt
+          </span>
+        )}
+      </span>
       {badge != null && (
         <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-semibold text-white">
           {badge}
@@ -200,13 +226,18 @@ export default function DashboardLayout({ children }) {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm..."
+              placeholder="Tìm kiếm (sắp ra mắt)..."
               className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors"
+              disabled
             />
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
-            <button className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 transition-colors">
+            <button
+              className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 transition-colors"
+              type="button"
+              title="Thông báo (sắp ra mắt)"
+            >
               <Bell className="h-5 w-5" />
               <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
             </button>
