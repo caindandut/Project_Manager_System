@@ -7,9 +7,13 @@ export interface ITaskRepository {
   findByAssignee(userId: number): Promise<Task[]>;
 
   /**
-   * Lưu (tạo mới hoặc cập nhật) một Task.
-   * Chi tiết ánh xạ sang Prisma/ORM sẽ do lớp triển khai phụ trách.
+   * Tạo mới một Task.
    */
-  save(task: Task): Promise<Task>;
+  create(task: Task): Promise<Task>;
+
+  /**
+   * Cập nhật Task hiện có.
+   */
+  update(task: Task): Promise<Task>;
 }
 

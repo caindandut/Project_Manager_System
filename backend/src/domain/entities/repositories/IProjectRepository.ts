@@ -6,10 +6,13 @@ export interface IProjectRepository {
   findByManager(managerId: number): Promise<Project[]>;
 
   /**
-   * Lưu (tạo mới hoặc cập nhật) một Project.
-   * Tuỳ cách triển khai, có thể dựa vào id === 0 để phân biệt create/update
-   * hoặc tách riêng create/update ở implementation.
+   * Tạo mới một Project.
    */
-  save(project: Project): Promise<Project>;
+  create(project: Project): Promise<Project>;
+
+  /**
+   * Cập nhật Project hiện có.
+   */
+  update(project: Project): Promise<Project>;
 }
 
