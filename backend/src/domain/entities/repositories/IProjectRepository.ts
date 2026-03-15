@@ -5,14 +5,7 @@ export interface IProjectRepository {
   findByCompany(companyId: number): Promise<Project[]>;
   findByManager(managerId: number): Promise<Project[]>;
 
-  /**
-   * Tạo mới một Project.
-   */
   create(project: Project): Promise<Project>;
-
-  /**
-   * Cập nhật Project hiện có.
-   */
   update(project: Project): Promise<Project>;
 }
 

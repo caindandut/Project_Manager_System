@@ -6,14 +6,7 @@ export interface ITaskRepository {
   findByTaskGroup(taskGroupId: number): Promise<Task[]>;
   findByAssignee(userId: number): Promise<Task[]>;
 
-  /**
-   * Tạo mới một Task.
-   */
   create(task: Task): Promise<Task>;
-
-  /**
-   * Cập nhật Task hiện có.
-   */
   update(task: Task): Promise<Task>;
 }
 
