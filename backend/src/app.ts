@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import companyRoutes from './routes/companyRoutes';
+import projectRoutes from './routes/projectRoutes';
 import { notFound, errorHandler } from './middlewares/errorMiddleware';
 import { initSocket } from './socket/socketServer';
 
@@ -23,6 +24,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/company', companyRoutes);
+app.use('/api/projects', projectRoutes);
 
 app.get('/', (_req: Request, res: Response): void => {
     res.send('API is running...');
