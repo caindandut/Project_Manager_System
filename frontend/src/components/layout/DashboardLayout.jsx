@@ -6,6 +6,7 @@ import {
   FolderKanban,
   ClipboardList,
   Users,
+  UserCircle,
   Settings,
   Search,
   Bell,
@@ -20,9 +21,10 @@ const NAV_BY_ROLE = {
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Thành viên", icon: Users, href: "/members" },
+      { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
     ],
     system: [
-      { label: "Cài đặt", icon: Settings, href: "/settings" },
+      { label: "Cài đặt công ty", icon: Settings, href: "/settings" },
     ],
   },
   Director: {
@@ -32,7 +34,9 @@ const NAV_BY_ROLE = {
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
       { label: "Thành viên", icon: Users, href: "/members" },
     ],
-    system: [],
+    system: [
+      { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
+    ],
   },
   Employee: {
     main: [
@@ -40,7 +44,9 @@ const NAV_BY_ROLE = {
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
     ],
-    system: [],
+    system: [
+      { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
+    ],
   },
 };
 

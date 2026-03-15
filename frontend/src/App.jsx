@@ -7,6 +7,8 @@ import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import DashboardPage from '@/pages/DashboardPage';
 import MembersPage from '@/pages/MembersPage';
+import ProfilePage from '@/pages/ProfilePage';
+import SettingsPage from '@/pages/SettingsPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
 
@@ -53,6 +55,24 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["Admin"]}>
                 <MembersPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute allowedRoles={["Admin"]}>
+                <SettingsPage />
               </ProtectedRoute>
             }
           />

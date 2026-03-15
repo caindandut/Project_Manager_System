@@ -8,6 +8,9 @@ const userApi = {
   delete: (id) => axiosClient.delete(`/users/${id}`),
   verifyInviteToken: (token) => axiosClient.get("/users/verify-invite", { params: { token } }),
   acceptInvite: (payload) => axiosClient.post("/users/accept-invite", payload),
+  getProfile: () => axiosClient.get("/users/profile"),
+  updateProfile: (data) => axiosClient.put("/users/profile", data),
+  changePassword: (data) => axiosClient.put("/users/change-password", data),
 };
 
 export default userApi;

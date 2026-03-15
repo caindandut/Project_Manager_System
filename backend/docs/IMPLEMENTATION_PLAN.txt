@@ -1,0 +1,1383 @@
+================================================================================
+       KẾ HOẠCH TRIỂN KHAI DỰ ÁN - PROJECT MANAGEMENT SYSTEM
+               (Phân tích chi tiết từng file sửa/tạo mới)
+                       Cập nhật: 15/03/2026
+================================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+I. ĐÁNH GIÁ HIỆN TRẠNG DỰ ÁN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TECH STACK:
+  Frontend : React 19 + Vite + Tailwind CSS + Shadcn UI + Lucide Icons
+  Backend  : Express 5 + TypeScript + Prisma ORM + MySQL
+  Auth     : JWT + Google OAuth + Nodemailer
+  Pattern  : DDD (Domain-Driven Design) + Repository Pattern
+
+ĐÃ HOÀN THÀNH (~25%):
+  ✅ Đăng nhập Email/Password + Google OAuth
+  ✅ Quên/Đặt lại mật khẩu qua email
+  ✅ Mời thành viên qua Email + Chấp nhận lời mời
+  ✅ Phân quyền 3 role: Admin / Giám đốc / Nhân viên
+  ✅ CRUD Quản lý người dùng (Admin)
+  ✅ Dashboard placeholder, Cài đặt công ty, Hồ sơ cá nhân
+  ✅ Activity Log, Protected routes, DashboardLayout, UI Components
+  ✅ Prisma Schema 15 models (nhưng chỉ dùng 3: user, company, activitylog)
+
+CHƯA TRIỂN KHAI (~75%):
+  ❌ Quản lý Dự án, Công việc, Milestone
+  ❌ Chat, Comment, Notification real-time
+  ❌ Quản lý tài liệu, Báo cáo, Dashboard thực
+  ❌ Trạng thái Online, Đổi mật khẩu lần đầu
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+II. GIAI ĐOẠN 0: SỬA CHỮA & CỦNG CỐ NỀN TẢNG (Tuần 1)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Mục tiêu: Sửa lỗi kiến trúc hiện tại, refactor code, chuẩn bị hạ tầng cho
+các tính năng mới (project, task, chat, notification).
+
+────────────────────────────────────────────────────────────────────────────────
+0.1. [SỬA] backend/src/middlewares/errorMiddleware.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  VẤN ĐỀ HIỆN TẠI:
+    File này chỉ có 22 dòng, xử lý lỗi rất đơn giản. Hiện tại nó dùng cách
+    kiểm tra `res.statusCode === 200 ? 500 : res.statusCode` rất bất tiện,
+    buộc controller phải tự set `res.status(xxx)` TRƯỚC KHI gọi `next(error)`.
+
+    Vấn đề thực tế:
+    - authController.ts (dòng 35-36, 55-62): phải tự xác định statusCode
+      bằng cách parse nội dung message: `message.includes('Tài khoản chưa...')`
+      → Nếu sau này sửa lại nội dung message tiếng Việt, logic status code bị
+      hỏng theo. Đây là anti-pattern nghiêm trọng.
+    - userController.ts: mỗi hàm đều phải try-catch riêng, lặp lại 10+ lần
+      pattern `res.status(500).json(...)`. Copy-paste rất nhiều.
+    - Không phân biệt được lỗi nghiệp vụ (user gửi sai data) vs lỗi hệ thống
+      (database down) → khó debug production.
+
+  GIẢI PHÁP:
+    Cập nhật errorMiddleware.ts để nhận diện class AppError (tạo ở bước 0.2),
+    trả về đúng status code + response format thống nhất:
+    {success: false, message: "...", data: null}
+
+  SAU KHI SỬA, CHỨC NĂNG MỚI:
+    - Tự động nhận statusCode từ AppError, không cần controller set thủ công
+    - Format response lỗi thống nhất cho toàn bộ API
+    - Log lỗi hệ thống (500) ra console, không log lỗi nghiệp vụ (400/404)
+    - Giấu stack trace ở production, hiện ở development
+
+────────────────────────────────────────────────────────────────────────────────
+0.2. [TẠO MỚI] backend/src/utils/AppError.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Hiện tại khi có lỗi, code chỉ throw new Error("message") — không có cách
+    nào gắn status code vào lỗi. Điều này dẫn đến:
+
+    Ví dụ trong authController.ts (dòng 55-62):
+    ```
+    const isForbidden =
+      message.includes('Tài khoản chưa được cấp') ||
+      message.includes('hoàn tất thiết lập tài khoản') ||
+      message.includes('Tài khoản đã bị khóa');
+    res.status(isForbidden ? 403 : 401);
+    ```
+    → Parse nội dung message tiếng Việt để quyết định HTTP status code!
+    → Nếu sửa message → toàn bộ logic status bị sai.
+
+    Ví dụ trong userController.ts — mỗi hàm phải viết try-catch + gán status:
+    ```
+    res.status(400).json({success: false, message: '...', data: null});
+    res.status(404).json({success: false, message: '...', data: null});
+    res.status(500).json({success: false, message: '...', data: null});
+    ```
+    → Lặp lại hàng chục lần, rất dễ sai sót.
+
+  CHỨC NĂNG CỦA FILE MỚI:
+    Class AppError extends Error cho phép gắn statusCode vào lỗi:
+    - AppError(message, statusCode)  : lỗi chung
+    - NotFoundError(message)         : 404 - không tìm thấy (user, project...)
+    - ValidationError(message)       : 400 - dữ liệu gửi lên không hợp lệ
+    - UnauthorizedError(message)     : 401 - chưa đăng nhập
+    - ForbiddenError(message)        : 403 - không có quyền
+
+    Ví dụ dùng sau khi tạo:
+    TRƯỚC: throw new Error('Tài khoản đã bị khóa') + parse message
+    SAU:   throw new ForbiddenError('Tài khoản đã bị khóa')
+    → errorMiddleware tự biết trả về 403, không cần parse text.
+
+  LỢI ÍCH:
+    - Mọi Service/Controller chỉ cần throw AppError, middleware xử lý hết
+    - Không còn try-catch lặp đi lặp lại trong controller
+    - Status code chính xác, không phụ thuộc nội dung message
+    - Dễ thêm loại lỗi mới (ConflictError 409, RateLimitError 429...)
+
+────────────────────────────────────────────────────────────────────────────────
+0.3. [TẠO MỚI] backend/src/validators/ (3 files validator + 1 middleware)
+────────────────────────────────────────────────────────────────────────────────
+
+  a) src/validators/authValidator.ts
+  b) src/validators/userValidator.ts
+  c) src/validators/companyValidator.ts
+  d) src/middlewares/validateMiddleware.ts
+
+  TẠI SAO CẦN TẠO:
+    Hiện tại KHÔNG có bước kiểm tra dữ liệu đầu vào (validation). Mỗi
+    controller tự viết if/else kiểm tra thủ công, rất lộn xộn:
+
+    Ví dụ trong userController.ts hàm changePassword (dòng 144-170):
+    ```
+    if (!oldPassword || !newPassword) { res.status(400)... }
+    if (newPassword.length < 8) { res.status(400)... }
+    ```
+    → Chỉ check length, KHÔNG check uppercase, special char, khoảng trắng
+    → Mỗi hàm check riêng, không reuse được
+    → Dễ quên validation khi thêm API mới
+
+    Ví dụ trong userController.ts hàm createUser (dòng 243-262):
+    ```
+    if (!email) { res.status(400)... }
+    if (role && !VALID_ROLES.includes(role)) { res.status(400)... }
+    ```
+    → Không check email format (regex)
+    → Không check max length, whitespace, SQL injection patterns
+
+  CHỨC NĂNG CỦA CÁC FILE MỚI:
+
+    d) validateMiddleware.ts — Middleware validate(schema):
+       - Nhận vào 1 Zod schema, tự động validate req.body
+       - Nếu sai → trả 400 + message lỗi chi tiết (field nào sai, tại sao)
+       - Nếu đúng → gọi next(), controller nhận data đã clean (trim, lowercase)
+       - Dùng thư viện Zod (cần cài: npm install zod) — nhẹ, type-safe, phổ biến
+
+    a) authValidator.ts — Schemas cho auth:
+       - loginSchema: email (bắt buộc, format email), password (bắt buộc, min 1)
+       - resetPasswordSchema: password (min 8, có uppercase + special char)
+       → Đảm bảo user không gửi request rỗng đến auth endpoints
+
+    b) userValidator.ts — Schemas cho user management:
+       - createUserSchema: email (format email), role (enum Admin|Director|Employee)
+       - updateProfileSchema: fullName (min 2, max 100), avatarPath (url format)
+       - changePasswordSchema: oldPassword (bắt buộc), newPassword (min 8, mật khẩu mạnh)
+       - acceptInviteSchema: token (bắt buộc), fullName (min 2), password (min 8)
+       → Admin tạo user không thể gửi email sai format, role không hợp lệ
+
+    c) companyValidator.ts — Schema cho company:
+       - updateCompanySchema: name (min 1, max 200), logo (url), industry (string),
+         size (string)
+       → Đảm bảo tên công ty không trống, logo phải là URL hợp lệ
+
+  LỢI ÍCH:
+    - Validation tập trung 1 chỗ, reuse được giữa các route
+    - Controller không còn phải if/else kiểm tra data
+    - Trả lỗi validation chi tiết: "email phải đúng format", "password thiếu..."
+    - Tự trim(), lowercase() dữ liệu trước khi vào service
+    - Type-safe: TypeScript biết chính xác kiểu dữ liệu sau validate
+
+────────────────────────────────────────────────────────────────────────────────
+0.4. [TẠO MỚI] backend/src/services/UserService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Hiện tại file userController.ts có 720 dòng, chứa CẢ logic nghiệp vụ LẪN
+    xử lý HTTP request/response. Đây là vi phạm nghiêm trọng nguyên tắc
+    "Separation of Concerns":
+
+    Ví dụ hàm createUser (dòng 241-370) — 130 dòng trong 1 controller:
+    - Validate email, role               (nên ở validator)
+    - Check email tồn tại                (nên ở service)
+    - Hash password                       (nên ở service)
+    - Tạo invite token + expiry           (nên ở service)
+    - Lưu user vào DB                     (nên ở service/repository)
+    - Ghi activity log                    (nên ở service)
+    - Cấu hình + gửi email               (nên ở service)
+    - Format HTML email template          (nên ở service/util riêng)
+    - Trả HTTP response                   (đúng chỗ — controller)
+
+    Vấn đề hậu quả:
+    - Không test được logic nghiệp vụ riêng (phải mock Express req/res)
+    - Muốn gọi createUser từ chỗ khác (VD: seed data) → không được, vì nó
+      cần req, res
+    - Sửa 1 bug nhỏ trong 720 dòng controller → rủi ro hỏng hàm khác
+
+    So sánh với AuthService.ts (đã làm đúng):
+    - AuthService.ts chỉ chứa logic: validate, query DB, trả kết quả
+    - authController.ts chỉ gọi authService rồi trả response
+    → Cần làm tương tự cho User
+
+  CHỨC NĂNG CỦA FILE MỚI:
+    UserService.ts — Tách toàn bộ logic nghiệp vụ từ userController.ts:
+
+    - getAllUsers(): Query DB, trả danh sách user + company info
+    - createUser(email, role, adminId): Kiểm tra email trùng → tạo user
+      status Pending → tạo invite token → ghi activity log → gửi email mời
+    - updateRole(userId, newRole, adminId): Kiểm tra user tồn tại → đổi role
+      → ghi activity log
+    - updateStatus(userId, newStatus, adminId): Kiểm tra không khóa chính
+      mình → đổi status → ghi activity log
+    - deleteUser(userId, adminId): Kiểm tra không xóa chính mình → xóa →
+      ghi activity log → xử lý lỗi P2003 (foreign key constraint)
+    - getProfile(userId): Lấy thông tin user hiện tại
+    - updateProfile(userId, data): Cập nhật fullName, avatarPath
+    - changePassword(userId, oldPw, newPw): Kiểm tra authProvider, so khớp
+      mật khẩu cũ, hash mật khẩu mới
+    - verifyInviteToken(token): Kiểm tra token hợp lệ, chưa hết hạn
+    - acceptInvite(token, fullName, password): Kích hoạt tài khoản
+
+  LỢI ÍCH:
+    - Controller giảm từ 720 dòng → ~150 dòng (chỉ parse req + gọi service + trả res)
+    - Logic nghiệp vụ test được riêng (unit test)
+    - Reuse được: VD gọi createUser từ script seed, từ API khác
+    - Sửa bug an toàn hơn: thay đổi trong service không ảnh hưởng response format
+
+────────────────────────────────────────────────────────────────────────────────
+0.5. [SỬA] backend/src/controllers/userController.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  VẤN ĐỀ HIỆN TẠI:
+    720 dòng, chứa logic nghiệp vụ + HTTP handling, copy-paste try-catch,
+    nodemailer transport config ở đầu file (dòng 11-17) — nên ở service.
+
+  THAY ĐỔI CỤ THỂ:
+    - Xóa toàn bộ import bcrypt, crypto, nodemailer, prisma — chuyển sang
+      UserService
+    - Xóa biến VALID_ROLES, VALID_STATUSES, inviteTransporter — service lo
+    - Mỗi hàm chỉ còn: parse params/body → gọi UserService → res.json()
+    - Xóa try-catch thủ công — dùng asyncHandler wrapper + errorMiddleware
+
+  VÍ DỤ TRƯỚC/SAU:
+    TRƯỚC (130 dòng cho createUser):
+      export const createUser = async (req, res) => {
+        try {
+          const { email, role } = req.body;
+          if (!email) { res.status(400)... }
+          if (role && !VALID_ROLES.includes(role)) { res.status(400)... }
+          const existingUser = await prisma.user.findUnique(...)
+          ... hash password ... tạo token ... lưu DB ... gửi email ...
+          res.status(201).json(...)
+        } catch { res.status(500)... }
+      }
+
+    SAU (~10 dòng):
+      export const createUser = asyncHandler(async (req, res) => {
+        const result = await userService.createUser(
+          req.body.email, req.body.role, req.user.id
+        );
+        res.status(201).json({success: true, data: result});
+      });
+
+────────────────────────────────────────────────────────────────────────────────
+0.6. [TẠO MỚI] backend/src/services/CompanyService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    companyController.ts (95 dòng) chứa logic DB trực tiếp. Tuy ngắn, nhưng
+    để nhất quán kiến trúc (controller → service → repository), cần tách ra.
+    Khi mở rộng company settings (thêm phòng ban, chi nhánh...), logic sẽ phình
+    to nếu để trong controller.
+
+  CHỨC NĂNG CỦA FILE MỚI:
+    - getCompany(): Lấy thông tin công ty đầu tiên, nếu chưa có → tạo mặc định
+    - updateCompany(data): Cập nhật tên, logo, ngành, quy mô
+    - (Tương lai) getOrgChart(): Lấy sơ đồ tổ chức công ty
+
+────────────────────────────────────────────────────────────────────────────────
+0.7. [SỬA] backend/src/controllers/companyController.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  THAY ĐỔI: Giống userController — tách logic sang CompanyService, controller
+  chỉ còn parse request + gọi service + trả response. Giảm từ 95 → ~30 dòng.
+
+────────────────────────────────────────────────────────────────────────────────
+0.8. [TẠO MỚI] backend/src/domain/entities/Project.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Dự án đang dùng DDD pattern (đã có User.ts, Password.ts, IUserRepository).
+    Để nhất quán, cần tạo domain entity cho Project trước khi làm Giai đoạn 1.
+
+    Prisma schema đã có model `project` (dòng 127-148) với các field:
+    id, company_id, manager_id, project_name, description, start_date, end_date,
+    color_code, label, status. Nhưng chưa có domain entity tương ứng.
+
+  CHỨC NĂNG CỦA FILE MỚI:
+    Class Project đóng gói logic nghiệp vụ:
+    - Thuộc tính: id, name, description, startDate, endDate, status, colorCode
+    - Ràng buộc: endDate phải > startDate, status chỉ chuyển theo flow
+      (Active → Completed → Archived), không thể archive project đang Active
+    - Method: canComplete() → true nếu tất cả task đã Done
+    - Method: isOverdue() → true nếu endDate < now và chưa Completed
+
+    Mục đích OOP:
+    - Encapsulation: không cho set status trực tiếp, phải qua method
+    - Business rule: ngày kết thúc luôn > ngày bắt đầu
+
+────────────────────────────────────────────────────────────────────────────────
+0.9. [TẠO MỚI] backend/src/domain/entities/Task.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tương tự Project.ts. Prisma schema có model `task` (dòng 163-191) nhưng
+    chưa có domain entity. Task là đối tượng phức tạp nhất hệ thống:
+
+  CHỨC NĂNG CỦA FILE MỚI:
+    Class Task đóng gói logic nghiệp vụ:
+    - Ràng buộc trạng thái: Todo → InProgress → Review → Completed
+      (không cho nhảy cóc: Todo → Completed)
+    - Ràng buộc progress: 0-100, không giảm khi đã 100%
+    - Method: archive() → chỉ cho archive khi status = Completed
+    - Method: isOverdue() → true nếu deadline < now và chưa Completed
+    - Method: canAssign(userId) → kiểm tra user có trong project không
+
+    Mục đích OOP:
+    - Encapsulation: progress, status được bảo vệ, phải đổi qua method
+    - Polymorphism: Task và SubTask cùng interface, xử lý giống nhau
+
+────────────────────────────────────────────────────────────────────────────────
+0.10. [TẠO MỚI] backend/src/domain/entities/repositories/IProjectRepository.ts
+      [TẠO MỚI] backend/src/domain/entities/repositories/ITaskRepository.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Theo DDD pattern đã có sẵn (IUserRepository.ts), cần interface repository
+    cho Project và Task để:
+    - Tách biệt logic nghiệp vụ khỏi Prisma (database agnostic)
+    - Dễ mock trong unit test (truyền fake repository thay vì gọi DB thật)
+    - Nếu đổi ORM (Prisma → TypeORM), chỉ sửa implementation, không sửa service
+
+  CHỨC NĂNG:
+    IProjectRepository: findById, findByCompany, findByManager, save, update, delete
+    ITaskRepository: findById, findByGroup, findByAssignee, save, update, delete
+
+────────────────────────────────────────────────────────────────────────────────
+0.11. [TẠO MỚI] backend/src/infrastructure/repositories/PrismaProjectRepository.ts
+      [TẠO MỚI] backend/src/infrastructure/repositories/PrismaTaskRepository.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Implement cụ thể các interface ở 0.10, dùng Prisma để query MySQL.
+    Tương tự PrismaUserRepository.ts đã có sẵn.
+
+  CHỨC NĂNG:
+    Chuyển đổi giữa Prisma model ↔ Domain entity:
+    - findById(id) → query prisma.project.findUnique → trả Project entity
+    - save(project) → prisma.project.create/update từ Project entity
+    - findByManager(userId) → lọc project theo manager_id
+
+────────────────────────────────────────────────────────────────────────────────
+0.12. [TẠO MỚI] backend/src/middlewares/uploadMiddleware.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Hiện tại dự án KHÔNG có khả năng upload file. Nhưng theo tài liệu yêu cầu:
+    - Upload avatar (Phần 1 - Hồ sơ cá nhân)
+    - Upload file kết quả task (Phần 3 - Báo cáo kết quả)
+    - Upload tài liệu dự án (Phần 6 - Quản lý tài liệu)
+    - Gửi hình ảnh trong chat (Phần 4 - Chat)
+
+    Hiện tại ProfilePage.jsx chỉ lưu avatar_path dạng URL text, không upload
+    file thực sự. app.ts dòng 19 đã có `app.use('/uploads', express.static(...))
+    nhưng chưa có middleware xử lý upload.
+
+  CHỨC NĂNG CỦA FILE MỚI:
+    Cấu hình Multer middleware:
+    - Lưu file vào thư mục uploads/ trên server
+    - Phân loại: uploads/avatars/, uploads/documents/, uploads/chat/
+    - Giới hạn dung lượng: 10MB mỗi file
+    - Lọc file type: chỉ cho phép ảnh (jpg, png, gif) và tài liệu (pdf, doc,
+      docx, xlsx, pptx)
+    - Đặt tên file unique: timestamp + random string tránh trùng
+    - Export các middleware: uploadAvatar, uploadDocument, uploadChatFile
+
+────────────────────────────────────────────────────────────────────────────────
+0.13. [TẠO MỚI] backend/src/socket/socketServer.ts
+      [TẠO MỚI] backend/src/socket/socketEvents.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Theo tài liệu, hệ thống cần nhiều tính năng real-time:
+    - Chat nhóm/cá nhân (Phần 4): tin nhắn gửi đi phải hiện ngay, không reload
+    - Thông báo real-time (Phần 4): khi được giao task, có comment mới...
+    - Trạng thái Online (Phần 1): chấm xanh/xám khi user online/offline
+    - Typing indicator trong chat
+
+    Hiện tại backend chỉ có Express HTTP (app.ts), KHÔNG có WebSocket.
+    Frontend cũng không có socket client. Nếu dùng HTTP polling (liên tục gọi
+    API để check tin nhắn mới) sẽ rất tốn tài nguyên và delay cao.
+
+  CHỨC NĂNG CỦA CÁC FILE MỚI:
+
+    socketEvents.ts — Định nghĩa tên sự kiện (constants):
+    - CHAT_SEND, CHAT_TYPING, CHAT_READ
+    - NOTIFICATION_NEW
+    - USER_ONLINE, USER_OFFLINE
+    - COMMENT_NEW
+    - TASK_UPDATED
+    → Tập trung 1 chỗ, tránh typo khi emit/listen
+
+    socketServer.ts — Khởi tạo và quản lý Socket.IO:
+    - Tích hợp vào HTTP server của Express (cùng port 5000)
+    - Xác thực JWT khi client kết nối (không cho anonymous connect)
+    - Quản lý rooms:
+      + user:{id} — room riêng mỗi user, để gửi notification
+      + project:{id} — room cho mỗi project, để broadcast task update
+      + chat:{id} — room cho mỗi nhóm chat
+    - Khi user connect: cập nhật is_online = true, join rooms
+    - Khi user disconnect: cập nhật is_online = false, rời rooms
+    - Emit function: sendToUser(userId, event, data),
+      sendToProject(projectId, event, data)
+
+────────────────────────────────────────────────────────────────────────────────
+0.14. [SỬA] backend/src/app.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  VẤN ĐỀ HIỆN TẠI:
+    app.ts dùng app.listen() trực tiếp (dòng 34-36), trả về Express app.
+    Nhưng Socket.IO cần HTTP server instance, không phải Express app:
+    ```
+    const server = http.createServer(app);
+    const io = new Server(server);
+    server.listen(PORT);
+    ```
+    → Cần đổi cách khởi tạo server.
+
+  THAY ĐỔI CỤ THỂ:
+    - Import http module, tạo httpServer từ app
+    - Import và gọi initSocket(httpServer) từ socketServer.ts
+    - Đổi app.listen → httpServer.listen
+    - Mount các route mới khi có (project, task, chat...)
+
+────────────────────────────────────────────────────────────────────────────────
+0.15. [TẠO MỚI] frontend/src/lib/socket.js
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Frontend cần kết nối Socket.IO client để nhận real-time events.
+    Cần 1 singleton instance (chỉ 1 connection, dùng chung toàn app).
+
+  CHỨC NĂNG:
+    - Tạo socket client kết nối ws://localhost:5000
+    - Gửi JWT token khi connect (để backend xác thực)
+    - Auto-reconnect khi mất kết nối
+    - Export: getSocket(), connectSocket(token), disconnectSocket()
+
+────────────────────────────────────────────────────────────────────────────────
+0.16. [TẠO MỚI] frontend/src/context/SocketContext.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Nhiều component cần truy cập socket (ChatPage, NotificationDropdown,
+    DashboardLayout — hiển thị online status). Cần React Context để share
+    socket instance mà không phải truyền props qua nhiều tầng.
+
+  CHỨC NĂNG:
+    - SocketProvider: wrap toàn app, tự connect khi user đăng nhập,
+      disconnect khi logout
+    - Cung cấp: socket instance, isConnected status
+    - Tự lắng nghe notification:new → cập nhật unread count
+
+────────────────────────────────────────────────────────────────────────────────
+0.17. [TẠO MỚI] frontend/src/hooks/useSocket.js
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Custom hook giúp component lắng nghe socket event một cách clean:
+    ```
+    useSocket('notification:new', (data) => { setNotifications(prev => ...) })
+    ```
+    Tự cleanup listener khi component unmount, tránh memory leak.
+
+────────────────────────────────────────────────────────────────────────────────
+0.18. [TẠO MỚI] frontend/src/components/ErrorBoundary.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Hiện tại nếu bất kỳ component nào trong React tree bị crash (throw error
+    trong render), toàn bộ app hiển thị màn hình trắng — user không biết
+    chuyện gì xảy ra, không có cách nào quay lại.
+
+  CHỨC NĂNG:
+    - Bắt runtime error trong React component tree
+    - Hiển thị UI fallback: "Đã xảy ra lỗi, vui lòng thử lại"
+    - Nút "Tải lại trang" để user recovery
+    - Log error ra console để developer debug
+
+────────────────────────────────────────────────────────────────────────────────
+0.19. [SỬA] frontend/src/pages/DashboardPage.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  VẤN ĐỀ HIỆN TẠI:
+    Dashboard hiện tại hiển thị data giả hoàn toàn:
+    - Dòng 107: STATS_ADMIN = [...value: "0"...] — hardcoded "0"
+    - Dòng 142: STATS_DIRECTOR = [...value: "0"...] — hardcoded "0"
+    - Dòng 176: STAT_EMPLOYEE = [...value: "0"...] — hardcoded "0"
+    - Không gọi bất kỳ API nào, không có useEffect fetch data
+    - Các card "Quản lý người dùng", "Dự án đang hoạt động", "Công việc
+      của tôi" đều hiển thị "Chưa có dữ liệu" cố định
+
+    Đây chỉ là UI mockup, không có chức năng thực tế.
+
+  THAY ĐỔI (thực hiện ở GĐ5 khi có Report API):
+    - Gọi API /api/reports/dashboard khi mount
+    - Hiển thị số liệu thực: tổng user, tổng project, task hoàn thành...
+    - Thêm biểu đồ (Recharts): pie chart phân bố task, bar chart tiến độ
+    - Loading skeleton khi đang fetch (đã có DashboardSkeleton nhưng chưa dùng)
+
+  THAY ĐỔI NGAY (GĐ0):
+    - Kết nối tạm với API hiện có (/api/users → đếm tổng user cho Admin)
+    - Sử dụng DashboardSkeleton đúng cách (hiện chỉ dùng khi loading auth)
+
+────────────────────────────────────────────────────────────────────────────────
+0.20. [SỬA] frontend/src/components/layout/DashboardLayout.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  VẤN ĐỀ HIỆN TẠI:
+    1) Sidebar có link đến /projects (dòng 22, 33, 43) và /tasks (dòng 34, 44)
+       nhưng KHÔNG CÓ route nào cho 2 URL này trong App.jsx → click vào sẽ
+       hiện trang 404 NotFoundPage.
+
+    2) Nút chuông thông báo (dòng 209-212) chỉ là icon tĩnh, có chấm đỏ
+       giả. Không có dropdown, không đếm notification thực, click không làm gì.
+
+    3) Thanh tìm kiếm (dòng 199-205) chỉ là input giả, gõ không tìm gì cả.
+
+  THAY ĐỔI CỤ THỂ:
+    GĐ0:
+    - Chưa sửa link /projects, /tasks (chờ GĐ1, GĐ2 tạo page)
+    - Thêm disabled state hoặc tooltip "Sắp ra mắt" cho link chưa có page
+
+    GĐ3:
+    - Thay nút Bell bằng NotificationDropdown component
+    - Hiển thị số notification chưa đọc thực (từ API)
+    - Click mở dropdown danh sách notification
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+III. GIAI ĐOẠN 1: QUẢN LÝ DỰ ÁN (Tuần 2-3)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tương ứng: Phần 2 tài liệu — QUẢN LÝ TỔ CHỨC & DỰ ÁN
+Mục tiêu: Admin/Giám đốc có thể tạo, sửa, xóa dự án; thêm/xóa thành viên;
+xem danh sách dự án; nhân viên xem dự án mình tham gia.
+
+────────────────────────────────────────────────────────────────────────────────
+1.1. [TẠO MỚI] backend/src/services/ProjectService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Prisma schema đã có model `project` và `projectmember` nhưng chưa có bất
+    kỳ code backend nào xử lý. Hiện tại KHÔNG CÓ API nào cho dự án cả.
+    Đây là chức năng CORE của hệ thống quản lý dự án.
+
+  CHỨC NĂNG CHI TIẾT:
+
+    createProject(data, userId):
+      Chức năng: Admin/Giám đốc tạo dự án mới
+      Logic: Validate ngày → tạo project → set manager_id = userId →
+             tạo projectmember cho manager (role: Manager) → ghi activity log
+      Quy tắc: end_date phải > start_date, tên dự án không trùng trong cùng công ty
+
+    getAllProjects(userId, role):
+      Chức năng: Lấy danh sách dự án theo quyền
+      Logic:
+        - Admin → xem TẤT CẢ dự án
+        - Director → xem dự án mình là manager + dự án mình là member
+        - Employee → CHỈ xem dự án mình là member
+      Trả về: tên, mô tả, ngày, status, số thành viên, tổng task, % hoàn thành
+
+    getProjectById(id, userId):
+      Chức năng: Xem chi tiết 1 dự án
+      Logic: Kiểm tra user có quyền xem (là member hoặc Admin) → trả full info
+      Quy tắc: Employee không phải member → 403 Forbidden
+
+    updateProject(id, data, userId):
+      Chức năng: Sửa thông tin dự án (tên, mô tả, ngày, màu, label)
+      Quy tắc: Chỉ Admin hoặc Manager của project mới được sửa
+
+    deleteProject(id, userId):
+      Chức năng: Xóa (soft delete → Archive) dự án
+      Quy tắc: Chỉ Admin hoặc Manager, phải confirm trước khi xóa
+      Logic: Đổi status → Archived, không xóa thật để giữ lịch sử
+
+    getProjectMembers(projectId):
+      Chức năng: Lấy danh sách thành viên dự án
+      Trả về: user info + role trong project (Manager/Member/Viewer)
+
+    addProjectMember(projectId, userId, role):
+      Chức năng: Thêm thành viên vào dự án
+      Quy tắc: Chỉ Manager/Admin, user phải thuộc công ty (status Active)
+      Logic: Tạo record projectmember → gửi notification cho user được thêm
+
+    removeProjectMember(projectId, userId):
+      Chức năng: Xóa thành viên khỏi dự án
+      Quy tắc: Không cho xóa Manager (phải chuyển quyền trước)
+
+    updateMemberRole(projectId, userId, newRole):
+      Chức năng: Đổi role thành viên trong dự án (Manager/Member/Viewer)
+      Quy tắc: Chỉ 1 Manager per project, đổi Manager = chuyển quyền
+
+    getProjectStats(projectId):
+      Chức năng: Thống kê nhanh cho project card
+      Trả về: totalTasks, completedTasks, overdueTasks, completionPercent
+
+────────────────────────────────────────────────────────────────────────────────
+1.2. [TẠO MỚI] backend/src/controllers/projectController.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Cần controller để nhận HTTP request và chuyển đến ProjectService.
+
+  CHỨC NĂNG: 10 endpoint handlers:
+    POST   /api/projects              → Tạo dự án mới
+    GET    /api/projects              → Danh sách dự án (lọc theo quyền)
+    GET    /api/projects/:id          → Chi tiết 1 dự án
+    PUT    /api/projects/:id          → Sửa thông tin dự án
+    DELETE /api/projects/:id          → Archive dự án
+    GET    /api/projects/:id/members  → Danh sách thành viên
+    POST   /api/projects/:id/members  → Thêm thành viên
+    DELETE /api/projects/:id/members/:userId → Xóa thành viên
+    PUT    /api/projects/:id/members/:userId → Đổi role thành viên
+    GET    /api/projects/:id/stats    → Thống kê dự án
+
+────────────────────────────────────────────────────────────────────────────────
+1.3. [TẠO MỚI] backend/src/routes/projectRoutes.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Định tuyến URL + gắn middleware phân quyền cho project endpoints.
+
+  CHỨC NĂNG:
+    - Tất cả route đều require `protect` middleware (phải đăng nhập)
+    - POST/PUT/DELETE project → thêm `authorizeRoles('Admin', 'Director')`
+    - GET → cho phép tất cả role (Employee xem project mình tham gia)
+
+────────────────────────────────────────────────────────────────────────────────
+1.4. [TẠO MỚI] backend/src/validators/projectValidator.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Validate input khi tạo/sửa project — đảm bảo tên không trống, ngày
+    đúng format, color_code đúng hex (#RRGGBB), label không quá dài.
+
+  CHỨC NĂNG:
+    - createProjectSchema: project_name (required, 1-255 chars), description
+      (optional), start_date (date format), end_date (date, > start_date),
+      color_code (hex format), label (max 100 chars)
+    - addMemberSchema: user_id (required, int), role (enum Manager|Member|Viewer)
+
+────────────────────────────────────────────────────────────────────────────────
+1.5. [TẠO MỚI] frontend/src/api/projectApi.js
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Frontend cần gọi 10 API endpoint project từ bước 1.2. Tập trung vào
+    1 file API (theo pattern đã có: authApi.js, userApi.js, companyApi.js).
+
+  CHỨC NĂNG:
+    - getAll(filters)       → GET /api/projects
+    - getById(id)           → GET /api/projects/:id
+    - create(data)          → POST /api/projects
+    - update(id, data)      → PUT /api/projects/:id
+    - archive(id)           → DELETE /api/projects/:id
+    - getMembers(id)        → GET /api/projects/:id/members
+    - addMember(id, data)   → POST /api/projects/:id/members
+    - removeMember(pId, uId)→ DELETE /api/projects/:id/members/:userId
+    - updateMemberRole(...) → PUT /api/projects/:id/members/:userId
+    - getStats(id)          → GET /api/projects/:id/stats
+
+────────────────────────────────────────────────────────────────────────────────
+1.6. [TẠO MỚI] frontend/src/pages/ProjectsPage.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Sidebar có link /projects (DashboardLayout dòng 22, 33, 43) nhưng không
+    có page nào → 404. Đây là trang chính để quản lý dự án.
+
+  CHỨC NĂNG UI:
+    Header:
+    - Tiêu đề "Dự án" + badge đếm số dự án
+    - Nút "Tạo dự án mới" (chỉ hiện cho Admin/Director)
+    - Bộ lọc: Status (Active/Completed/Archived), ô tìm kiếm tên dự án
+
+    Body — Card Grid:
+    - Mỗi dự án = 1 card với:
+      + Color stripe bên trái (từ color_code)
+      + Tên dự án (in đậm) + label badge
+      + Mô tả ngắn (cắt 2 dòng)
+      + Ngày: "15/03 → 30/06/2026"
+      + Avatar stack: ảnh đại diện 3-4 thành viên đầu + "+5 thêm"
+      + Progress bar: "65% hoàn thành" (từ getStats)
+      + Status badge: Đang hoạt động / Hoàn thành / Lưu trữ
+    - Click card → navigate đến /projects/:id (ProjectDetailPage)
+    - Dropdown menu (⋮): Chỉnh sửa, Lưu trữ, Xóa
+
+    Empty state: Khi chưa có dự án → illustration + "Tạo dự án đầu tiên"
+
+────────────────────────────────────────────────────────────────────────────────
+1.7. [TẠO MỚI] frontend/src/pages/ProjectDetailPage.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Khi click vào 1 dự án trên ProjectsPage, cần trang chi tiết hiển thị
+    tất cả thông tin: tổng quan, công việc, thành viên, tài liệu.
+
+  CHỨC NĂNG UI — Tabs navigation:
+
+    Tab "Tổng quan":
+    - Thông tin dự án: tên, mô tả, ngày bắt đầu/kết thúc, trạng thái
+    - Thống kê: 4 card (tổng task, hoàn thành, đang làm, quá hạn)
+    - Progress bar tổng thể dự án
+    - Danh sách task gần deadline (5 task sắp hết hạn nhất)
+
+    Tab "Công việc" (tạo ở GĐ2):
+    - Switch view: List | Kanban
+    - Hiển thị task groups + tasks
+
+    Tab "Thành viên":
+    - Danh sách thành viên: avatar, tên, email, role trong project
+    - Nút "Thêm thành viên" → Dialog chọn từ danh sách công ty
+    - Menu actions: Đổi role, Xóa khỏi dự án
+
+    Tab "Tài liệu" (tạo ở GĐ4):
+    - File manager
+
+    Tab "Cài đặt" (chỉ Manager/Admin):
+    - Sửa tên, mô tả, ngày, màu sắc, label
+    - Nút "Lưu trữ dự án" (Archive)
+
+────────────────────────────────────────────────────────────────────────────────
+1.8. [TẠO MỚI] frontend/src/components/project/CreateProjectDialog.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Dialog (modal) tạo dự án mới, mở khi click "Tạo dự án" trên ProjectsPage.
+
+  CHỨC NĂNG UI:
+    - Form: Tên dự án (required), Mô tả (textarea)
+    - Date pickers: Ngày bắt đầu, Ngày kết thúc
+    - Color picker: chọn màu nhận diện dự án (6-8 màu preset)
+    - Label input: nhãn phân loại (VD: "Frontend", "Backend", "Design")
+    - Multi-select: Chọn thành viên từ danh sách công ty (checkbox list)
+    - Nút: "Hủy" + "Tạo dự án"
+    - Loading state khi submit
+    - Validation: tên không trống, end_date > start_date
+
+────────────────────────────────────────────────────────────────────────────────
+1.9. [SỬA] frontend/src/App.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  VẤN ĐỀ HIỆN TẠI:
+    App.jsx chỉ có routes cho: /, /login, /forgot-password, /reset-password,
+    /accept-invite, /dashboard, /members, /profile, /settings, *
+
+    KHÔNG CÓ routes cho /projects, /projects/:id, /tasks, /chat
+
+  THAY ĐỔI:
+    GĐ1: Thêm routes:
+      /projects    → ProjectsPage (Protected, tất cả role)
+      /projects/:id → ProjectDetailPage (Protected, tất cả role)
+
+    GĐ2: Thêm routes:
+      /tasks → MyTasksPage (Protected, Director + Employee)
+
+    GĐ3: Thêm routes:
+      /chat         → ChatPage (Protected, tất cả role)
+      /chat/:groupId → ChatPage (Protected, tất cả role)
+
+────────────────────────────────────────────────────────────────────────────────
+1.10. [SỬA] backend/src/app.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  THAY ĐỔI: Mount route mới
+    THÊM: app.use('/api/projects', projectRoutes);
+    (Các route khác mount ở giai đoạn tương ứng)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IV. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC (Tuần 4-5)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tương ứng: Phần 3 tài liệu — QUẢN LÝ CÔNG VIỆC
+Mục tiêu: Tạo task group, task, subtask; giao việc; cập nhật tiến độ;
+xem dạng List và Kanban.
+
+────────────────────────────────────────────────────────────────────────────────
+2.1. [TẠO MỚI] backend/src/services/TaskGroupService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Theo tài liệu Phần 3.1: "Tạo nhóm công việc (Task List): Gom nhóm các
+    công việc liên quan". Prisma schema có model `taskgroup` (dòng 214-222):
+    id, project_id, group_name, position, task[].
+
+    Mỗi dự án có nhiều TaskGroup (VD: "Thiết kế UI", "Backend API", "Testing"),
+    mỗi TaskGroup chứa nhiều Task. Giống cột trong Trello board.
+
+  CHỨC NĂNG:
+    - createTaskGroup(projectId, name): Tạo nhóm mới, position = cuối danh sách
+    - getTaskGroups(projectId): Lấy tất cả nhóm + tasks bên trong, sắp xếp
+      theo position
+    - updateTaskGroup(id, data): Đổi tên nhóm
+    - deleteTaskGroup(id): Xóa nhóm + cascade xóa tất cả task bên trong (hỏi
+      confirm trước)
+    - reorderTaskGroups(projectId, orderedIds[]): Kéo thả đổi thứ tự nhóm
+
+────────────────────────────────────────────────────────────────────────────────
+2.2. [TẠO MỚI] backend/src/services/TaskService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Đây là SERVICE LỚN NHẤT, cốt lõi hệ thống. Prisma schema đã có model
+    `task` (dòng 163-191) nhưng chưa có code xử lý nào.
+
+  CHỨC NĂNG CHI TIẾT:
+
+    createTask(taskGroupId, data, creatorId):
+      Tại sao: Phần 3.1 tài liệu — "Tạo Task: Nhập tiêu đề, mô tả, giao
+        leader, giao thành viên, thiết lập deadline"
+      Logic: Validate data → tạo task trong taskGroup → tạo taskassignee nếu
+        có assignee_ids → gửi notification cho người được giao
+      Dữ liệu: title (bắt buộc), description, deadline, priority (Low/Medium/
+        High/Urgent), assignee_ids[]
+
+    getTaskById(id):
+      Tại sao: Khi click vào task, cần xem toàn bộ thông tin chi tiết
+      Trả về: task info + assignees (tên, avatar) + subtasks + comments (5
+        mới nhất) + dependencies + documents đính kèm
+
+    updateTask(id, data, userId):
+      Tại sao: Sửa tiêu đề, mô tả, deadline, priority
+      Quy tắc: Chỉ creator hoặc assignee hoặc project Manager mới được sửa
+      Logic: Update task → ghi activity log → notify assignees về thay đổi
+
+    updateTaskStatus(id, newStatus, userId):
+      Tại sao: Phần 3.2 — "Cập nhật trạng thái: Chưa Làm → Đang làm →
+        Chờ xác nhận → Hoàn thành"
+      Quy tắc transition:
+        Todo → InProgress (bắt đầu làm)
+        InProgress → Review (gửi review)
+        Review → Completed (manager duyệt) hoặc Review → InProgress (trả lại)
+        KHÔNG CHO: Todo → Completed (nhảy cóc)
+      Logic: Validate transition → update status → notify stakeholders
+
+    updateTaskProgress(id, percent, userId):
+      Tại sao: Phần 3.2 — "Tự điền % hoàn thành công việc"
+      Quy tắc: 0 ≤ percent ≤ 100, nếu percent = 100 → auto chuyển Review
+
+    archiveTask(id, userId):
+      Tại sao: Ẩn task đã hoàn thành để không làm rối board
+      Quy tắc: Chỉ archive khi status = Completed
+
+    assignTask(taskId, userId, role):
+      Tại sao: Phần 3.1 — "Giao việc cho thành viên (@Assign)"
+      Logic: Tạo taskassignee (role: Main/Support) → notify người được giao
+      Quy tắc: User phải là member của project chứa task này
+
+    unassignTask(taskId, userId):
+      Tại sao: Bỏ giao việc cho người nào đó
+      Quy tắc: Không cho bỏ Main assignee nếu chỉ còn 1 người
+
+    createSubtask(parentTaskId, data):
+      Tại sao: Phần 3.1 — "Subtask: Tạo danh sách việc nhỏ trong việc lớn"
+      Logic: Tạo task mới với parent_task_id = parentTaskId
+      Subtask cũng là Task, nhưng thuộc về task cha (giống checklist)
+
+    addDependency(predecessorId, successorId):
+      Tại sao: Phần 3.1 — "Task Dependencies: Việc A xong mới làm việc B"
+      Logic: Tạo record taskdependency → kiểm tra KHÔNG tạo vòng lặp
+        (A phụ thuộc B, B phụ thuộc C, C phụ thuộc A → vô tận)
+      Quy tắc: Nếu predecessor chưa Done → successor không thể InProgress
+
+    getMyTasks(userId, filters):
+      Tại sao: Phần 5.2 — "My Tasks: Xem danh sách công việc của chính mình"
+      Trả về: Tất cả task user được giao, nhóm theo project, filter theo
+        status/priority/deadline
+
+    reorderTasks(taskGroupId, orderedIds[]):
+      Tại sao: Kéo thả task trong list view để sắp xếp ưu tiên
+
+────────────────────────────────────────────────────────────────────────────────
+2.3. [TẠO MỚI] backend/src/controllers/taskGroupController.ts
+     [TẠO MỚI] backend/src/controllers/taskController.ts
+     [TẠO MỚI] backend/src/routes/taskGroupRoutes.ts
+     [TẠO MỚI] backend/src/routes/taskRoutes.ts
+     [TẠO MỚI] backend/src/validators/taskValidator.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  CHỨC NĂNG: Controllers nhận request → gọi service → trả response.
+  Routes gắn middleware auth + phân quyền. Validators kiểm tra input.
+
+  API Endpoints — TaskGroup:
+    POST   /api/projects/:projectId/task-groups        → Tạo nhóm công việc
+    GET    /api/projects/:projectId/task-groups         → Lấy danh sách nhóm + tasks
+    PUT    /api/task-groups/:id                         → Đổi tên nhóm
+    DELETE /api/task-groups/:id                         → Xóa nhóm
+    PUT    /api/projects/:projectId/task-groups/reorder → Đổi thứ tự nhóm
+
+  API Endpoints — Task:
+    POST   /api/task-groups/:groupId/tasks      → Tạo task mới trong nhóm
+    GET    /api/tasks/:id                       → Xem chi tiết task
+    PUT    /api/tasks/:id                       → Sửa task
+    DELETE /api/tasks/:id                       → Xóa task
+    PUT    /api/tasks/:id/status                → Đổi trạng thái
+    PUT    /api/tasks/:id/progress              → Cập nhật % hoàn thành
+    PUT    /api/tasks/:id/archive               → Lưu trữ task
+    POST   /api/tasks/:id/assignees             → Giao việc
+    DELETE /api/tasks/:id/assignees/:userId     → Bỏ giao việc
+    POST   /api/tasks/:id/subtasks              → Tạo subtask
+    GET    /api/tasks/:id/subtasks              → Danh sách subtask
+    POST   /api/tasks/:id/dependencies          → Thêm phụ thuộc
+    DELETE /api/tasks/:id/dependencies/:preId   → Xóa phụ thuộc
+    GET    /api/users/me/tasks                  → Task của tôi
+
+────────────────────────────────────────────────────────────────────────────────
+2.4. [TẠO MỚI] frontend/src/api/taskApi.js
+     [TẠO MỚI] frontend/src/api/taskGroupApi.js
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Frontend cần gọi tất cả task/taskGroup API endpoints ở bước 2.3.
+
+────────────────────────────────────────────────────────────────────────────────
+2.5. [TẠO MỚI] frontend/src/components/task/TaskListView.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tài liệu Phần 2.2: "List View: Xem dạng danh sách truyền thống"
+    Đây là view mặc định khi mở tab Công việc trong dự án.
+
+  CHỨC NĂNG UI:
+    - Hiển thị TaskGroups dạng expandable sections (accordion)
+    - Mỗi section = 1 TaskGroup (VD: "Thiết kế UI", "Backend API")
+    - Trong mỗi section = danh sách tasks:
+      + Tiêu đề task (click mở TaskDetailPanel)
+      + Avatar assignees (stack tối đa 3)
+      + Priority badge (Thấp=xanh, Trung bình=vàng, Cao=cam, Khẩn cấp=đỏ)
+      + Deadline (đỏ nếu quá hạn)
+      + Status dropdown (click đổi nhanh, không cần mở panel)
+    - Nút "+ Thêm task" ở cuối mỗi section (inline input)
+    - Drag & drop: kéo task giữa các group, đổi thứ tự
+      (dùng @dnd-kit/core + @dnd-kit/sortable)
+    - Nút "+ Thêm nhóm" ở cuối danh sách
+
+────────────────────────────────────────────────────────────────────────────────
+2.6. [TẠO MỚI] frontend/src/components/task/KanbanView.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tài liệu Phần 2.2: "Kanban Board: Xem dạng thẻ kéo thả theo trạng thái"
+    Đây là view phổ biến nhất cho quản lý công việc Agile.
+
+  CHỨC NĂNG UI:
+    - 4 cột: "Chưa làm" | "Đang làm" | "Chờ xác nhận" | "Hoàn thành"
+      (tương ứng: Todo | InProgress | Review | Completed)
+    - Mỗi cột = danh sách task cards
+    - Mỗi card: tiêu đề, assignee avatar, priority stripe (màu), deadline
+    - KÉO THẢ card giữa các cột = tự động đổi status
+      (VD: kéo từ "Chưa làm" → "Đang làm" = updateTaskStatus → InProgress)
+    - Nút "+ Thêm" ở mỗi cột → inline tạo task nhanh
+    - Đếm số task mỗi cột
+    - Empty column: illustration "Không có task nào"
+
+────────────────────────────────────────────────────────────────────────────────
+2.7. [TẠO MỚI] frontend/src/components/task/TaskDetailPanel.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Khi click vào task (từ ListView hoặc KanbanView), cần panel hiển thị
+    TOÀN BỘ thông tin task mà không rời khỏi trang hiện tại.
+
+  CHỨC NĂNG UI:
+    Slide-over panel từ bên phải (overlay, không phải page mới):
+    - Header: Tiêu đề task (editable inline), nút đóng (X)
+    - Status selector (dropdown 4 trạng thái)
+    - Priority selector (4 mức)
+    - Description: textarea rich text (có thể dùng markdown)
+    - Assignees section: danh sách avatar + tên, nút "+" thêm người
+    - Deadline picker: date/time input
+    - Progress bar + input %: kéo slider hoặc nhập số
+    - Subtasks section: checklist, mỗi subtask có checkbox, nút thêm
+    - Dependencies section: danh sách task phụ thuộc, nút thêm
+    - Comments section (render TaskComments — tạo ở GĐ3)
+    - Attachments section (render DocumentList — tạo ở GĐ4)
+    - Activity log: lịch sử thay đổi task (ai sửa gì, lúc nào)
+
+────────────────────────────────────────────────────────────────────────────────
+2.8. [TẠO MỚI] frontend/src/pages/MyTasksPage.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Sidebar có link /tasks (DashboardLayout dòng 34, 44) cho Director và
+    Employee nhưng không có page → 404.
+    Tài liệu Phần 5.2: "My Tasks: Xem danh sách công việc của chính mình"
+
+  CHỨC NĂNG UI:
+    - Header: "Công việc của tôi" + tổng số task
+    - Bộ lọc: Status, Priority, Deadline range, Project (multi-select)
+    - Task list nhóm theo project:
+      + Tên project (expandable)
+      + Danh sách task: title, status, priority, deadline, progress
+    - Click task → mở TaskDetailPanel
+    - Summary bar: "5 chưa làm / 3 đang làm / 2 chờ review / 10 hoàn thành"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+V. GIAI ĐOẠN 3: GIAO TIẾP & THÔNG BÁO REAL-TIME (Tuần 6-7)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tương ứng: Phần 4 tài liệu — GIAO TIẾP & CỘNG TÁC
+
+────────────────────────────────────────────────────────────────────────────────
+3.1. [TẠO MỚI] backend/src/services/CommentService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tài liệu Phần 4.1: "Bình luận (Comment): Thảo luận trực tiếp ngay dưới
+    mỗi task". Prisma schema có model `comment` (dòng 47-58) nhưng chưa dùng.
+
+  CHỨC NĂNG:
+    - createComment(taskId, userId, content): Tạo comment → emit socket event
+      "comment:new" đến room project → tạo notification cho assignees
+    - getCommentsByTask(taskId, page, limit): Phân trang, mỗi trang 20 comments
+    - updateComment(id, userId, newContent): Chỉ người viết mới được sửa
+    - deleteComment(id, userId): Người viết hoặc Admin mới được xóa
+
+────────────────────────────────────────────────────────────────────────────────
+3.2. [TẠO MỚI] backend/src/services/ChatService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tài liệu Phần 4.1: "Chat cá nhân (1-1) và Chat nhóm dự án, gửi tin nhắn
+    văn bản, emoji, hình ảnh, file đính kèm".
+    Prisma schema có: chatgroup, chatgroupmember, message — chưa dùng.
+    Đây là tính năng WebSocket, tin nhắn phải hiện NGAY LẬP TỨC.
+
+  CHỨC NĂNG:
+    - createChatGroup(projectId, name, memberIds): Tạo nhóm chat cho dự án,
+      tự thêm tất cả member dự án vào nhóm
+    - getChatGroupsByUser(userId): Danh sách nhóm chat user tham gia
+    - sendMessage(groupId, senderId, content, type): Lưu vào DB → emit
+      socket "chat:send" đến room chat:{groupId} → tăng unread count
+    - sendDirectMessage(senderId, receiverId, content, type): Chat 1-1
+      (tự tạo "nhóm ẩn" 2 người nếu chưa có)
+    - getMessages(groupId, page, limit): Lấy tin nhắn phân trang (load lên)
+    - markAsRead(groupId, userId): Đánh dấu đã đọc tin nhắn trong nhóm
+
+────────────────────────────────────────────────────────────────────────────────
+3.3. [TẠO MỚI] backend/src/services/NotificationService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tài liệu Phần 4.3: "Nhận thông báo Real-time khi có tương tác".
+    Prisma schema có model `notification` (dòng 115-125) — chưa dùng.
+    Hiện tại DashboardLayout có icon Bell (dòng 209) nhưng chỉ là hình tĩnh.
+
+  CHỨC NĂNG:
+    - createNotification(userId, content, linkUrl): Tạo notification trong DB
+      → emit socket "notification:new" đến user:{userId} → hiện toast trên
+      frontend ngay lập tức
+    - getNotifications(userId, page, limit): Danh sách notification phân trang
+    - getUnreadCount(userId): Đếm số chưa đọc (hiển thị trên badge bell icon)
+    - markAsRead(notificationId, userId): Đánh dấu đã đọc 1 thông báo
+    - markAllAsRead(userId): Đánh dấu tất cả đã đọc
+
+    Tự động tạo notification khi:
+    - Được giao task mới → "Bạn vừa được giao task X trong dự án Y"
+    - Task đến deadline < 24h → "Task X sắp hết hạn!"
+    - Có comment mới trên task mình → "ABC đã bình luận trên task X"
+    - Được thêm vào dự án mới → "Bạn được thêm vào dự án Y"
+    - Có tin nhắn mới khi offline → "Bạn có N tin nhắn mới"
+
+────────────────────────────────────────────────────────────────────────────────
+3.4. [TẠO MỚI] backend/src/controllers/ + routes/ (comment, chat, notification)
+────────────────────────────────────────────────────────────────────────────────
+
+  6 files: commentController.ts, chatController.ts, notificationController.ts
+           commentRoutes.ts, chatRoutes.ts, notificationRoutes.ts
+
+  API Endpoints — Comment:
+    POST   /api/tasks/:taskId/comments    → Thêm bình luận vào task
+    GET    /api/tasks/:taskId/comments    → Danh sách bình luận (phân trang)
+    PUT    /api/comments/:id              → Sửa bình luận
+    DELETE /api/comments/:id              → Xóa bình luận
+
+  API Endpoints — Chat:
+    GET    /api/chat/groups               → Danh sách nhóm chat của tôi
+    POST   /api/chat/groups               → Tạo nhóm chat
+    GET    /api/chat/groups/:id/messages  → Tin nhắn trong nhóm (phân trang)
+    POST   /api/chat/groups/:id/messages  → Gửi tin nhắn (REST fallback)
+    GET    /api/chat/direct/:userId       → Tin nhắn 1-1 (phân trang)
+    POST   /api/chat/direct/:userId       → Gửi tin nhắn 1-1
+
+  API Endpoints — Notification:
+    GET    /api/notifications             → Danh sách thông báo (phân trang)
+    GET    /api/notifications/unread      → Đếm số chưa đọc
+    PUT    /api/notifications/:id/read    → Đánh dấu đã đọc
+    PUT    /api/notifications/read-all    → Đánh dấu tất cả đã đọc
+
+────────────────────────────────────────────────────────────────────────────────
+3.5. [TẠO MỚI] frontend/src/pages/ChatPage.jsx + components/chat/*
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tài liệu yêu cầu chat nhóm + 1-1. Cần trang chat riêng.
+
+  CHỨC NĂNG UI:
+    Layout 3 phần:
+    - Sidebar trái: Danh sách nhóm chat + DM, tìm kiếm, badge unread
+    - Giữa: Nội dung chat (MessageList + MessageInput)
+    - Phải: Chi tiết nhóm (danh sách thành viên, tùy chọn)
+
+    Components:
+    - ChatSidebar.jsx: Danh sách nhóm, click chọn, unread badge
+    - MessageList.jsx: Danh sách tin nhắn, infinite scroll lên, auto scroll xuống
+    - MessageBubble.jsx: 1 tin nhắn (avatar, tên, nội dung, giờ, trạng thái)
+    - MessageInput.jsx: Ô nhập text, nút gửi, emoji, đính kèm file
+
+────────────────────────────────────────────────────────────────────────────────
+3.6. [TẠO MỚI] frontend/src/components/task/TaskComments.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tích hợp vào TaskDetailPanel (bước 2.7), hiển thị comment trên task.
+
+  CHỨC NĂNG UI:
+    - Danh sách comments: avatar, tên, thời gian, nội dung
+    - Form thêm comment mới (textarea + nút gửi)
+    - Nút sửa/xóa (chỉ hiện cho chủ comment)
+    - Real-time: tự thêm comment mới khi nhận socket event
+
+────────────────────────────────────────────────────────────────────────────────
+3.7. [TẠO MỚI] frontend/src/components/notification/NotificationDropdown.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Thay thế nút Bell tĩnh trong DashboardLayout (dòng 209-212) bằng dropdown
+    thông báo thực sự.
+
+  CHỨC NĂNG UI:
+    - Badge số chưa đọc (từ API getUnreadCount)
+    - Click mở dropdown danh sách 10 notification mới nhất
+    - Mỗi notification: icon, nội dung, thời gian ("5 phút trước")
+    - Click notification → redirect đến link_url (VD: mở task)
+    - Nút "Đánh dấu tất cả đã đọc"
+    - Real-time: tự cập nhật khi nhận socket event "notification:new"
+
+────────────────────────────────────────────────────────────────────────────────
+3.8. [SỬA] frontend/src/components/layout/DashboardLayout.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  THAY ĐỔI:
+    - Dòng 209-212: Thay nút <button><Bell/></button> bằng
+      <NotificationDropdown /> component
+    - Thêm link /chat vào sidebar cho tất cả role
+    - Hiển thị chấm online status (xanh/xám) bên cạnh user avatar ở sidebar
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VI. GIAI ĐOẠN 4: QUẢN LÝ TÀI LIỆU & MILESTONE (Tuần 8)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tương ứng: Phần 5 + 6 tài liệu
+
+────────────────────────────────────────────────────────────────────────────────
+4.1. [TẠO MỚI] backend/src/services/DocumentService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tài liệu Phần 6: "Upload tài liệu từ máy tính hoặc liên kết Google Drive,
+    quản lý phiên bản, tạo cấu trúc thư mục nhiều cấp".
+    Prisma schema có model `document` (dòng 72-94) — chưa dùng.
+
+  CHỨC NĂNG:
+    - createFolder(projectId, name, parentFolderId): Tạo thư mục trong dự án,
+      hỗ trợ nested folders (parent → child → grandchild)
+    - uploadFile(projectId, file, parentFolderId, uploaderId): Nhận file từ
+      Multer → lưu vào uploads/documents/ → tạo record DB
+    - getDocuments(projectId, parentFolderId): Danh sách file/folder, dạng
+      cây (tree) hoặc flat list theo parent
+    - downloadDocument(id): Stream file cho client download
+    - deleteDocument(id): Xóa file trên disk + record DB. Nếu folder → cascade
+    - linkGoogleDrive(projectId, url, name): Lưu URL Google Drive vào DB
+
+────────────────────────────────────────────────────────────────────────────────
+4.2. [TẠO MỚI] backend/src/services/MilestoneService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    Tài liệu Phần 5.1: "Tạo Milestone cho dự án (VD: Giai đoạn 1, Release 1.0),
+    gắn Task vào Milestone, tự tính % hoàn thành".
+
+    LƯU Ý: Prisma schema CHƯA CÓ model milestone. Cần thêm vào schema.prisma
+    trước rồi chạy prisma migrate dev.
+
+  CHỨC NĂNG:
+    - createMilestone(projectId, title, deadline): Tạo cột mốc dự án
+    - getMilestonesByProject(projectId): Danh sách milestone kèm % hoàn thành
+    - updateMilestone(id, data): Sửa tiêu đề, deadline
+    - deleteMilestone(id): Xóa (chỉ xóa milestone, không xóa tasks)
+    - addTaskToMilestone(milestoneId, taskId): Gắn task vào milestone
+    - removeTaskFromMilestone(milestoneId, taskId): Gỡ task khỏi milestone
+    - calculateProgress(milestoneId): Tính % = (task Completed / total tasks)
+
+────────────────────────────────────────────────────────────────────────────────
+4.3. [TẠO MỚI] frontend/src/components/document/DocumentExplorer.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  CHỨC NĂNG UI:
+    - Breadcrumb: Home > Thư mục A > Thư mục B
+    - Grid view: icon file/folder + tên + kích thước + ngày upload
+    - Context menu (chuột phải): Download, Rename, Delete
+    - Nút "Tạo thư mục", "Upload file", "Liên kết Google Drive"
+    - Drag & drop upload (kéo file từ desktop vào browser)
+    - Preview: click ảnh → modal phóng to, click PDF → embed viewer
+    - Tích hợp vào Tab "Tài liệu" trong ProjectDetailPage
+
+────────────────────────────────────────────────────────────────────────────────
+4.4. [TẠO MỚI] frontend/src/components/milestone/MilestoneList.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  CHỨC NĂNG UI:
+    - Danh sách milestone timeline dọc
+    - Mỗi milestone: title, deadline, progress bar (tính từ tasks)
+    - Expand: hiển thị danh sách tasks thuộc milestone (checkbox status)
+    - Dialog tạo/sửa milestone
+    - Tích hợp vào ProjectDetailPage (Tab Tổng quan hoặc Tab riêng)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VII. GIAI ĐOẠN 5: BÁO CÁO, DASHBOARD & HOÀN THIỆN (Tuần 9-10)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+────────────────────────────────────────────────────────────────────────────────
+5.1. [TẠO MỚI] backend/src/services/ReportService.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO CẦN TẠO:
+    DashboardPage.jsx hiện hiển thị "0" cho mọi stat. Cần API trả dữ liệu
+    thống kê thực để dashboard có ý nghĩa.
+
+  CHỨC NĂNG:
+    - getDashboardStats(userId, role):
+      + Admin: tổng user (Active), tổng project (Active), tổng task, overdue
+      + Director: số project quản lý, tiến độ trung bình, task quá hạn team
+      + Employee: task hôm nay, đã hoàn thành tuần này, deadline sắp tới
+
+    - getProjectBurndown(projectId):
+      Tài liệu Phần 5.2: "Burndown Chart: Biểu đồ tiến độ theo Agile"
+      Trả về: mảng [{date, idealRemaining, actualRemaining}] để vẽ line chart
+
+    - getEmployeeReport(userId):
+      Tài liệu Phần 5.2: "Báo cáo nhân viên"
+      Trả về: danh sách task + status + thời gian hoàn thành → quản lý đánh giá
+
+────────────────────────────────────────────────────────────────────────────────
+5.2. [SỬA] frontend/src/pages/DashboardPage.jsx (lần 2)
+────────────────────────────────────────────────────────────────────────────────
+
+  THAY ĐỔI:
+    - Thay STATS_ADMIN, STATS_DIRECTOR, STAT_EMPLOYEE (hardcoded "0") bằng
+      data thực từ API /api/reports/dashboard
+    - Thêm useEffect + useState + loading state
+    - Thêm biểu đồ (Recharts):
+      + Admin: Pie chart phân bố task theo status, Bar chart task theo project
+      + Director: Progress bars các dự án, Line chart trend hoàn thành
+      + Employee: Weekly completion chart, danh sách deadline sắp tới
+
+────────────────────────────────────────────────────────────────────────────────
+5.3. [TẠO MỚI] frontend/src/components/chart/BurndownChart.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  CHỨC NĂNG:
+    Line chart (dùng Recharts): 2 đường:
+    - Đường lý tưởng: giảm đều từ tổng task → 0 theo ngày
+    - Đường thực tế: giảm theo số task hoàn thành thực
+    - Tích hợp vào ProjectDetailPage Tab Tổng quan
+
+────────────────────────────────────────────────────────────────────────────────
+5.4. [TẠO MỚI - TÙY CHỌN] frontend/src/components/task/GanttView.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO: Tài liệu Phần 2.2 — "Gantt/Table: Xem dạng bảng tiến độ"
+  CHỨC NĂNG: Hiển thị task trên timeline, thanh ngang = duration, dependencies
+  = mũi tên nối, kéo thả thay đổi thời gian. NICE-TO-HAVE.
+
+────────────────────────────────────────────────────────────────────────────────
+5.5. [TẠO MỚI - TÙY CHỌN] frontend/src/components/task/CalendarView.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  TẠI SAO: Tài liệu Phần 2.2 — "Calendar View: Xem công việc trên lịch"
+  CHỨC NĂNG: Lịch tháng/tuần, mỗi task = event trên ngày deadline.
+  NICE-TO-HAVE.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VIII. THỨ TỰ ƯU TIÊN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+P1 - BẮT BUỘC (Core):
+  ✦ GĐ0: Refactor + Hạ tầng         → Nền tảng cho mọi thứ
+  ✦ GĐ1: Quản lý Dự án CRUD         → Core business
+  ✦ GĐ2: Quản lý Công việc          → Core business
+
+P2 - RẤT QUAN TRỌNG:
+  ✦ GĐ3: Comment + Notification     → Collaboration
+  ✦ GĐ5: Dashboard thực             → Visibility
+
+P3 - QUAN TRỌNG (nếu còn thời gian):
+  ✦ GĐ3: Chat system                → Communication
+  ✦ GĐ4: Document + Milestone       → File sharing + Tracking
+
+P4 - NICE TO HAVE:
+  ✦ GĐ5: Gantt, Calendar, Burndown  → Advanced views
+  ✦ Dark Mode, Time Tracking         → UX polish
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IX. PACKAGES CẦN CÀI THÊM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BACKEND:
+  npm install zod                     → Validation schemas
+  npm install multer @types/multer    → File upload
+  npm install socket.io               → WebSocket server
+
+FRONTEND:
+  npm install socket.io-client        → WebSocket client
+  npm install @dnd-kit/core @dnd-kit/sortable → Drag & drop cho Kanban
+  npm install recharts                → Charts cho Dashboard
+  npm install react-hot-toast         → Toast notification UI
+  npm install date-fns                → Format date tiếng Việt
+
+  (Tùy chọn):
+  npm install @fullcalendar/react @fullcalendar/daygrid → Calendar view
+  npm install gantt-task-react        → Gantt chart
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+X. TIMELINE TỔNG QUAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tuần 1      : GĐ0 — Refactor, AppError, Validators, Service tách, Socket setup
+Tuần 2-3    : GĐ1 — Project CRUD (backend + frontend)
+Tuần 4-5    : GĐ2 — Task Management, ListView, KanbanView
+Tuần 6-7    : GĐ3 — Comment, Chat, Notification (WebSocket)
+Tuần 8      : GĐ4 — Document Explorer, Milestone
+Tuần 9-10   : GĐ5 — Reports, Dashboard thực, Polish, Testing
+
+┌─────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+│  Tuần 1 │ Tuần 2-3 │ Tuần 4-5 │ Tuần 6-7 │  Tuần 8  │ Tuần 9-10│
+├─────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+│  GĐ 0   │   GĐ 1   │   GĐ 2   │   GĐ 3   │   GĐ 4   │   GĐ 5   │
+│ Refactor│ Project  │  Task    │  Chat &  │ Document │ Reports  │
+│ & Setup │ Mgmt     │  Mgmt    │  Notif   │ & Miles  │ & Polish │
+│ ████░░░ │ ████████ │ ████████ │ ████████ │ ██████░░ │ ██████░░ │
+│  25%    │  40%     │  60%     │  80%     │  90%     │  100%    │
+└─────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+
+================================================================================
+                           --- HẾT KẾ HOẠCH ---
+================================================================================

@@ -1,0 +1,299 @@
+Dưới đây là đánh giá thiết kế hướng đối tượng cho đề tài Quản lý dự án và công việc, tập trung đúng 4 tính chất của OOP (Đóng gói – Kế thừa – Đa hình – Trừu tượng), đồng thời đưa ra các yêu cầu chỉnh sửa, bổ sung để thiết kế đạt mức chuẩn học thuật + sẵn sàng triển khai bằng NodeJS.
+I. ĐÁNH GIÁ TỔNG QUAN
+✅ Điểm mạnh
+Phân rã hệ thống đúng domain: định danh, phân quyền, dự án, công việc, giao tiếp.
+Nhận diện được kế thừa vai trò người dùng (Admin, Director, Employee).
+Các lớp nghiệp vụ (Project, Task, Milestone, Document…) khá đầy đủ.
+Có tư duy workflow (approve, assign, report progress, generate chart…).
+⚠️ Vấn đề chính
+Thiết kế chưa thể hiện đầy đủ bản chất OOP, đặc biệt:
+Trừu tượng còn yếu (nhiều class kiêm quá nhiều trách nhiệm).
+Đa hình mới tồn tại “trên giấy”, chưa có điểm gọi đa hình rõ ràng.
+Đóng gói chưa phù hợp với NodeJS (thiếu bất biến, setter/getter).
+Nhiều quan hệ dạng quan hệ dữ liệu hơn là quan hệ đối tượng.
+Một số class có dấu hiệu God Class (Project, Task, Person).
+II. ĐÁNH GIÁ THEO 4 TÍNH CHẤT HƯỚNG ĐỐI TƯỢNG
+1. ĐÓNG GÓI (Encapsulation)
+🔎 Đánh giá hiện tại
+Em đã phân chia private / protected / public ✅ (tư duy đúng).
+Tuy nhiên:
+NodeJS (JS/TS) chỉ hỗ trợ đóng gói thực sự khi dùng:
+#privateField (ES2022)
+hoặc private/protected trong TypeScript.
+Nhiều thuộc tính có thể bị sửa trực tiếp, gây vi phạm bất biến.
+⚠️ Ví dụ chưa tốt:
+Task.percent_complete
+Task.updateStatus(status : String)
+→ Bất kỳ ai cũng có thể set status mà không kiểm tra điều kiện nghiệp vụ.
+✅ Yêu cầu chỉnh sửa
+Ẩn trạng thái nhạy cảm, chỉ sửa qua phương thức
+Task.status
+Task.percent_complete
+Project.status
+Notification.is_read
+Áp dụng bất biến nghiệp vụ (invariant):
+Không cho percent_complete giảm nếu đã hoàn thành.
+Không cho archive() task chưa DONE.
+Không cho approveProject() nếu thiếu milestone.
+✅ Gợi ý (TypeScript)
+class Task {
+ #status: TaskStatus;
+ 
+ updateStatus(newStatus: TaskStatus) {
+   if (!this.isValidTransition(newStatus)) {
+     throw new Error("Invalid status transition");
+   }
+   this.#status = newStatus;
+ }
+}
+2. KẾ THỪA (Inheritance)
+🔎 Đánh giá hiện tại
+✅ Điểm tốt
+Quan hệ Person <|-- Admin, Director, Employee đúng bản chất.
+Thuộc tính và hành vi riêng cho từng vai trò hợp lý.
+⚠️ Vấn đề
+Person đang chứa quá nhiều trách nhiệm:
+Profile
+Log
+Notification
+Activity
+Một số hành vi không thuộc về Person theo nguyên lý SRP.
+✅ Yêu cầu chỉnh sửa
+Giữ Person là lớp trừu tượng
+abstract Person
+Tách trách nhiệm:
+NotificationService
+ActivityLogService
+→ Person sở hữu nhưng không trực tiếp xử lý logic
+✅ Sơ đồ đề xuất
+Person (abstract)
+├─ Admin
+├─ Director
+└─ Employee
+3. ĐA HÌNH (Polymorphism) — ĐIỂM YẾU NHẤT HIỆN TẠI ❗
+🔎 Đánh giá hiện tại
+Có kế thừa nhưng gần như không có chỗ gọi đa hình.
+Phương thức:
+Admin.manageUsers()
+Director.approveProject()
+Employee.reportProgress()
+→ Không dùng chung interface, nên không thể gọi thống nhất.
+✅ Yêu cầu bắt buộc bổ sung đa hình
+✅ 3.1. Đa hình theo vai trò xử lý dự án
+Tạo interface:
+interface ProjectAction {
+ handle(project: Project): boolean;
+}
+Triển khai:
+class Admin extends Person implements ProjectAction {
+ handle(project) { /* audit or override */ }
+}
+ 
+class Director extends Person implements ProjectAction {
+ handle(project) { return project.approve(this.signature); }
+}
+Sử dụng:
+function processProject(actor: ProjectAction, project: Project) {
+ actor.handle(project);
+}
+✅ → Đa hình thật sự xuất hiện
+✅ 3.2. Đa hình trong Notification (rất nên có)
+Hiện tại:
+Notification.pushRealtime()
+Notification.sendEmail()
+→ 1 class làm quá nhiều.
+✅ Tách thành:
+interface NotificationChannel {
+ send(): void;
+}
+ 
+class EmailNotification implements NotificationChannel {}
+class RealtimeNotification implements NotificationChannel {}
+class SlackNotification implements NotificationChannel {}
+Sử dụng:
+notif.send(); // đa hình
+4. TRỪU TƯỢNG (Abstraction)
+🔎 Đánh giá hiện tại
+Có class thật quá sớm, thiếu abstraction.
+Project, Task, Document ôm luôn logic hiển thị (Gantt, Kanban, export).
+⚠️ Vi phạm:
+Single Responsibility Principle
+Open/Closed Principle
+✅ Yêu cầu chỉnh sửa
+✅ 4.1. Trừu tượng hoá báo cáo & biểu đồ
+Thay vì:
+Project.generateBurndownChart()
+Project.viewGanttChart()
+Project.exportReport()
+✅ Tách:
+interface ReportGenerator {
+ generate(project: Project): Report;
+}
+ 
+class GanttReport implements ReportGenerator {}
+class KanbanReport implements ReportGenerator {}
+class BurndownReport implements ReportGenerator {}
+✅ 4.2. Trừu tượng hoá Task
+Task hiện tại đang làm:
+Workflow
+Phụ thuộcDưới đây là bản đánh giá thiết kế hướng đối tượng (OO Design) cho đề tài Quản lý dự án & công việc dựa trên thiết kế em đưa ra, tập trung 4 tính chất cốt lõi của OOP (Trừu tượng – Đóng gói – Kế thừa – Đa hình), đồng thời đưa ra các yêu cầu chỉnh sửa/bổ sung cụ thể, có xét đến triển khai bằng NodeJS (JavaScript/TypeScript).
+1. ĐÁNH GIÁ TỔNG QUAN
+✅ Điểm mạnh
+Phân rã miền nghiệp vụ rõ ràng: Danh tính, Dự án, Công việc, Giao tiếp, Log.
+Có kế thừa giữa Person → Admin/Director/Employee.
+Các thực thể phù hợp nghiệp vụ thực tế (Task, Milestone, ProjectMember, TimeEntry…).
+Dễ ánh xạ sang REST API/MVC trong NodeJS.
+⚠️ Vấn đề cốt lõi
+Thiết kế chưa thể hiện đầy đủ 4 tính chất OOP, đặc biệt là:
+Trừu tượng còn mờ nhạt (chưa có abstract concept thực sự).
+Đóng gói bị phá vỡ do thuộc tính public nhiều, thiếu invariant.
+Đa hình gần như chưa được khai thác, mới dừng ở kế thừa phân vai.
+Một số class đang ôm quá nhiều trách nhiệm (vi phạm SRP – Single Responsibility).
+Thiết kế thiên về ERD hơn là OO Domain Model.
+2. ĐÁNH GIÁ THEO 4 TÍNH CHẤT OOP
+2.1. TRỪU TƯỢNG (ABSTRACTION)
+📌 Hiện trạng
+Person là lớp cơ sở, nhưng chưa thực sự trừu tượng:
+Không có phương thức abstract.
+Không có hành vi bắt buộc các lớp con phải hiện thực.
+Các đối tượng như Project, Task, Notification, Document đều là concrete class, trong khi nghiệp vụ có nhiều biến thể.
+❌ Hạn chế
+Chưa có khái niệm:
+“Ai có thể thực hiện hành động X?”
+“Đối tượng nào có thể sinh hoạt động?”
+Thiếu trừu tượng cho:
+Quyền hành (Permission)
+Hành động ghi log
+Gửi thông báo
+✅ Yêu cầu chỉnh sửa/bổ sung
+Bổ sung các abstraction sau:
+abstract class Person {
+ #id: number
+ protected fullName: string
+ 
+ abstract getRole(): Role
+ abstract canApproveProject(): boolean
+ abstract getPermissions(): Permission[]
+}
+abstract class Notifiable {
+ abstract notify(notification: Notification): void
+}
+abstract class WorkItem {
+ id: number
+ title: string
+ status: WorkStatus
+ 
+➡️ Task và Milestone đều kế thừa WorkItem\ ➡️ Giúp đa hình + trừu tượng đúng bản chất
+2.2. ĐÓNG GÓI (ENCAPSULATION)
+📌 Hiện trạng
+Thuộc tính nhiều lớp đang để:
+public
+hoặc không chỉ rõ phạm vi truy cập
+Thao tác nghiệp vụ có thể:
+sửa percent_complete
+sửa status
+sửa role trực tiếp từ bên ngoài
+⚠️ Điều này đặc biệt nguy hiểm trong NodeJS vì JS không enforce access level nếu không dùng # hoặc TypeScript.
+❌ Hạn chế
+Không có invariant:
+percent_complete ∈ [0, 100]
+deadline >= start_date
+Task chỉ archive khi hoàn thành
+updateProfile(data: JSON) quá “mở”, dễ phá vỡ dữ liệu.
+✅ Yêu cầu chỉnh sửa/bổ sung
+Ẩn thuộc tính quan trọng
+class Task {
+ #percentComplete = 0
+ 
+ updateProgress(value: number) {
+   if (value < 0 || value > 100) {
+     throw new Error("Invalid progress")
+   }
+   this.#percentComplete = value
+ }
+}
+Không cho set trạng thái trực tiếp
+changeStatus(newStatus: TaskStatus) {
+ if (!this.isValidTransition(this.status, newStatus)) {
+   throw new Error("Invalid state transition")
+ }
+ this.status = newStatus
+}
+Thay thế JSON mù bằng DTO
+updateProfile(data: UpdateProfileDTO): boolean
+➡️ Đạt đúng Encapsulation + Integrity
+2.3. KẾ THỪA (INHERITANCE)
+📌 Hiện trạng
+✅ Phần kế thừa vai trò Person → Admin/Director/Employee là hợp lý.
+❌ Hạn chế
+Kế thừa chỉ dùng để phân vai, chưa gắn với hành vi nghiệp vụ cốt lõi.
+Một số hành vi nên dùng composition thay vì inheritance:
+Chat
+Notify
+Log
+✅ Yêu cầu chỉnh sửa/bổ sung
+Giữ kế thừa vai trò, nhưng:
+Không để controller/service phải if role === Admin
+Dồn logic vào domain class
+if (user.canApproveProject()) {
+  user.approveProject()
+}
+Không kế thừa lan man
+✅ Person → Admin/Director/Employee
+❌ Không nên Task → BugTask / FeatureTask (dùng type)
+2.4. ĐA HÌNH (POLYMORPHISM)
+📌 Hiện trạng
+🚨 Đây là điểm yếu lớn nhất
+Các lớp có nhiều phương thức giống nhau:
+sendNotification()
+exportReport()
+calculateProgress()
+Nhưng không có interface / abstract base để gọi đa hình.
+❌ Hạn chế
+Phải if/else theo loại đối tượng.
+Khó mở rộng (ví dụ thêm SMS Notification).
+✅ Yêu cầu chỉnh sửa/bổ sung (RẤT QUAN TRỌNG)
+1. Đa hình Notification
+interface NotificationChannel {
+ send(notification: Notification): void
+}
+ 
+class EmailNotification implements NotificationChannel {}
+class RealtimeNotification implements NotificationChannel {}
+notificationService.send(channel, notification)
+➡️ Thêm SMS / Slack không sửa code cũ
+2. Đa hình báo cáo / dashboard
+interface Reportable {
+ export(format: ExportFormat): File
+}
+➡️ Project, Company, Employee đều có thể export
+3. Đa hình WorkItem
+abstract class WorkItem {
+ abstract calculateProgress(): number
+}
+➡️ Task / Milestone / Epic (sau này)
+3. ĐÁNH GIÁ PHÙ HỢP VỚI NODEJS
+✅ Phù hợp nếu em:
+Dùng TypeScript (bắt buộc nếu muốn OO đúng nghĩa).
+Áp dụng DDD nhẹ: Entity – ValueObject – Service.
+Không nhét logic nghiệp vụ vào Controller.
+⚠️ Nếu chỉ dùng JavaScript thường:
+Thiết kế OO này sẽ bị phá vỡ
+private/protected/abstract không enforce.
+✅ Yêu cầu bắt buộc
+✅TypeScript
+✅ ESLint + strict mode
+✅ DTO + Domain Service
+✅ Không thao tác thuộc tính trực tiếp từ controller
+4. CÁC YÊU CẦU CHỈNH SỬA, BỔ SUNG – TÓM TẮT
+✅ BẮT BUỘC:
+Bổ sung abstract classes & interfaces
+Giảm mạnh public fields
+Bỏ JSON “tùy tiện” → DTO cụ thể
+Áp dụng đa hình cho Notification / Report / WorkItem
+Ràng buộc invariant nghiệp vụ trong domain
+Chỉ dùng kế thừa khi có quan hệ “is-a” thực sự
+✅ NÊN CÓ:
+Document quyền & flow trạng thái
+Phụ lục class diagram UML
+Mapping domain → REST API

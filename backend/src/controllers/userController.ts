@@ -16,6 +16,191 @@ const inviteTransporter = nodemailer.createTransport({
   },
 });
 
+// GET /api/users/profile — Thông tin user đang đăng nhập (req.user.id)
+export const getProfile = async (req: Request | any, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Chưa đăng nhập', data: null });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        role: true,
+        avatar_path: true,
+        authProvider: true,
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ success: false, message: 'Không tìm thấy người dùng', data: null });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy thông tin hồ sơ thành công',
+      data: {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+        avatar_path: user.avatar_path,
+        authProvider: user.authProvider,
+      },
+    });
+  } catch (error) {
+    console.error('getProfile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy hồ sơ',
+      data: null,
+    });
+  }
+};
+
+// PUT /api/users/profile — Cập nhật fullName, avatarPath
+export const updateProfile = async (req: Request | any, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Chưa đăng nhập', data: null });
+      return;
+    }
+
+    const { fullName, avatarPath } = req.body;
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(fullName !== undefined && { full_name: fullName == null ? null : String(fullName).trim() }),
+        ...(avatarPath !== undefined && { avatar_path: avatarPath == null || avatarPath === '' ? null : String(avatarPath) }),
+      },
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        role: true,
+        avatar_path: true,
+        authProvider: true,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật hồ sơ thành công',
+      data: {
+        id: updated.id,
+        full_name: updated.full_name,
+        email: updated.email,
+        role: updated.role,
+        avatar_path: updated.avatar_path,
+        authProvider: updated.authProvider,
+      },
+    });
+  } catch (error) {
+    console.error('updateProfile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi cập nhật hồ sơ',
+      data: null,
+    });
+  }
+};
+
+// PUT /api/users/change-password — Đổi mật khẩu (chỉ tài khoản local)
+export const changePassword = async (req: Request | any, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Chưa đăng nhập', data: null });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { authProvider: true, password: true },
+    });
+
+    if (!user) {
+      res.status(404).json({ success: false, message: 'Không tìm thấy người dùng', data: null });
+      return;
+    }
+
+    if (user.authProvider === 'google') {
+      res.status(400).json({
+        success: false,
+        message: 'Tài khoản Google không thể đổi mật khẩu',
+        data: null,
+      });
+      return;
+    }
+
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) {
+      res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập mật khẩu hiện tại và mật khẩu mới',
+        data: null,
+      });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      res.status(400).json({
+        success: false,
+        message: 'Mật khẩu mới phải có ít nhất 8 ký tự',
+        data: null,
+      });
+      return;
+    }
+
+    if (!user.password) {
+      res.status(400).json({
+        success: false,
+        message: 'Tài khoản chưa có mật khẩu. Vui lòng dùng quên mật khẩu.',
+        data: null,
+      });
+      return;
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      res.status(400).json({
+        success: false,
+        message: 'Mật khẩu hiện tại không đúng',
+        data: null,
+      });
+      return;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Đổi mật khẩu thành công',
+      data: null,
+    });
+  } catch (error) {
+    console.error('changePassword error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi đổi mật khẩu',
+      data: null,
+    });
+  }
+};
+
 // GET /api/users
 export const getAllUsers = async (_req: Request, res: Response): Promise<void> => {
   try {

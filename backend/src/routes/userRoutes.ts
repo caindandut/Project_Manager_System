@@ -9,6 +9,9 @@ import {
   deleteUser,
   verifyInviteToken,
   acceptInvite,
+  getProfile,
+  updateProfile,
+  changePassword,
 } from '../controllers/userController';
 
 const router: Router = express.Router();
@@ -20,6 +23,11 @@ router.post('/accept-invite', acceptInvite);
 
 // Các route phía dưới yêu cầu đăng nhập
 router.use(protect);
+
+// Hồ sơ cá nhân & đổi mật khẩu (mọi role)
+router.get('/profile', getProfile);
+router.put('/profile', updateProfile);
+router.put('/change-password', changePassword);
 
 // Chỉ Admin mới được truy cập quản lý user
 router.get('/', authorizeRoles('Admin'), getAllUsers);

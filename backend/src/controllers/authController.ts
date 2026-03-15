@@ -65,12 +65,18 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
 export const getMe = async (req: Request | any, res: Response): Promise<void> => {
   const { id, email, fullName, role, avatarPath } = req.user || {};
 
+  const raw = await prisma.user.findUnique({
+    where: { id },
+    select: { authProvider: true },
+  });
+
   res.json({
     id,
     email,
     full_name: fullName,
     role,
     avatar: avatarPath,
+    authProvider: raw?.authProvider ?? 'local',
   });
 };
 

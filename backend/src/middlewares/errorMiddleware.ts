@@ -1,22 +1,38 @@
 import { Request, Response, NextFunction } from 'express';
+import { AppError } from '../utils/AppError';
 
+/** 404 - Route không tồn tại */
 export const notFound = (req: Request, res: Response, next: NextFunction): void => {
-    const error = new Error(`Không tìm thấy đường dẫn - ${req.originalUrl}`);
-    res.status(404);
-    next(error);
+  next(new AppError(`Không tìm thấy đường dẫn - ${req.originalUrl}`, 404));
 };
 
-export const errorHandler = (
-    err: any,
-    _req: Request,
-    res: Response,
-    _next: NextFunction
-): void => {
-    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+const errorResponse = (message: string, stack?: string | null) => ({
+  success: false,
+  message,
+  data: null,
+  ...(stack && { stack }),
+});
 
-    res.status(statusCode);
-    res.json({
-        message: err.message,
-        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
-    });
+
+export const errorHandler = (
+  err: Error | AppError,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+): void => {
+  const isAppError = err instanceof AppError;
+  const statusCode = isAppError ? err.statusCode : 500;
+  const message = err.message || 'Đã xảy ra lỗi không mong muốn';
+
+  if (statusCode >= 500) {
+    console.error('[Error]', statusCode, message);
+    if (err.stack) {
+      console.error(err.stack);
+    }
+  }
+
+  const includeStack = process.env.NODE_ENV !== 'production' && !!err.stack;
+  const payload = errorResponse(message, includeStack ? err.stack : undefined);
+
+  res.status(statusCode).json(payload);
 };
