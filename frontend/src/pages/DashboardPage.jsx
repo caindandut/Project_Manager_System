@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import userApi from "@/api/userApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Card,
@@ -103,18 +105,23 @@ function StatCard({ label, value, icon: Icon, iconBg, trend, trendLabel }) {
 // ═══════════════════════════════════════════════════════════════
 //  ADMIN DASHBOARD
 // ═══════════════════════════════════════════════════════════════
-const STATS_ADMIN = [
-  { label: "Tổng người dùng", value: "0", icon: Users, iconBg: "bg-blue-500" },
-  { label: "Dự án đang chạy", value: "0", icon: FolderKanban, iconBg: "bg-emerald-500" },
-  { label: "Công việc hoàn thành", value: "0", icon: CheckCircle, iconBg: "bg-cyan-500" },
-  { label: "Chờ phê duyệt", value: "0", icon: ClipboardCheck, iconBg: "bg-amber-500" },
+const STATS_ADMIN_BASE = [
+  { label: "Tổng người dùng", key: "totalUsers", icon: Users, iconBg: "bg-blue-500" },
+  { label: "Dự án đang chạy", key: "activeProjects", icon: FolderKanban, iconBg: "bg-emerald-500" },
+  { label: "Công việc hoàn thành", key: "completedTasks", icon: CheckCircle, iconBg: "bg-cyan-500" },
+  { label: "Chờ phê duyệt", key: "pendingApprovals", icon: ClipboardCheck, iconBg: "bg-amber-500" },
 ];
 
-function AdminDashboard() {
+function AdminDashboard({ stats }) {
+  const cards = STATS_ADMIN_BASE.map((s) => ({
+    ...s,
+    value: String(stats?.[s.key] ?? 0),
+  }));
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {STATS_ADMIN.map((s) => (
+        {cards.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}
       </div>
@@ -239,7 +246,15 @@ function EmployeeDashboard({ fullName }) {
 // ═══════════════════════════════════════════════════════════════
 const DashboardPage = () => {
   const { user, loading } = useAuth();
-  const isLoading = loading;
+  const [adminStats, setAdminStats] = useState({
+    totalUsers: 0,
+    activeProjects: 0,
+    completedTasks: 0,
+    pendingApprovals: 0,
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const isLoading = loading || statsLoading;
   const hasUser = user && user.role;
 
   const getTitle = (role) => {
@@ -247,6 +262,34 @@ const DashboardPage = () => {
     if (role === "Director") return "Tổng quan Điều hành";
     return null;
   };
+
+  useEffect(() => {
+    if (!user || user.role !== "Admin") return;
+
+    let cancelled = false;
+    setStatsLoading(true);
+
+    userApi
+      .getAll()
+      .then((res) => {
+        if (cancelled) return;
+        const list = res.data?.data || [];
+        setAdminStats((prev) => ({
+          ...prev,
+          totalUsers: Array.isArray(list) ? list.length : 0,
+        }));
+      })
+      .catch((err) => {
+        console.error("Fetch admin stats error:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   return (
     <DashboardLayout>
@@ -262,7 +305,7 @@ const DashboardPage = () => {
         {isLoading || !hasUser ? (
           <DashboardSkeleton />
         ) : user.role === "Admin" ? (
-          <AdminDashboard />
+          <AdminDashboard stats={adminStats} />
         ) : user.role === "Director" ? (
           <DirectorDashboard />
         ) : user.role === "Employee" ? (
