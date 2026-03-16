@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer';
 import { user_role, user_status } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/AppError';
+import { companyService } from './CompanyService';
 import type {
   CreateUserInput,
   UpdateProfileInput,
@@ -139,6 +140,16 @@ export class UserService {
       throw new ValidationError('Email đã tồn tại trong hệ thống');
     }
 
+    const admin = await prisma.user.findUnique({
+      where: { id: adminId },
+      select: { company_id: true },
+    });
+    let companyId = admin?.company_id;
+    if (!companyId) {
+      const company = await companyService.getCompany();
+      companyId = company.id;
+    }
+
     const randomPassword = crypto.randomBytes(32).toString('hex');
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(randomPassword, salt);
@@ -152,6 +163,7 @@ export class UserService {
         full_name: null,
         role: (role as user_role) || 'Employee',
         status: 'Pending',
+        company_id: companyId,
         inviteToken,
         inviteExpires,
       },
@@ -347,6 +359,12 @@ export class UserService {
       throw new ValidationError('Link mời không hợp lệ hoặc đã hết hạn');
     }
 
+    let companyId = user.company_id;
+    if (!companyId) {
+      const company = await companyService.getCompany();
+      companyId = company.id;
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -356,6 +374,7 @@ export class UserService {
         full_name: fullName,
         password: hashedPassword,
         status: 'Active',
+        company_id: companyId,
         inviteToken: null,
         inviteExpires: null,
       },
