@@ -11,20 +11,15 @@ import type {
   AddMemberInput,
   UpdateMemberRoleInput,
 } from '../validators/projectValidator';
+import { companyService } from './CompanyService';
 
 export class ProjectService {
   async createProject(input: CreateProjectInput, userId: number) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { company_id: true },
-    });
-    if (!user?.company_id) {
-      throw new ValidationError('Người dùng chưa thuộc công ty nào');
-    }
+    const companyId = await this.ensureUserCompany(userId);
 
     const duplicate = await prisma.project.findFirst({
       where: {
-        company_id: user.company_id,
+        company_id: companyId,
         project_name: input.project_name,
         status: { not: 'Archived' },
       },
@@ -41,7 +36,7 @@ export class ProjectService {
 
     const project = await prisma.project.create({
       data: {
-        company_id: user.company_id,
+        company_id: companyId,
         manager_id: userId,
         project_name: input.project_name,
         description: input.description ?? null,
@@ -65,7 +60,7 @@ export class ProjectService {
       const validMembers = await prisma.user.findMany({
         where: {
           id: { in: input.member_ids },
-          company_id: user.company_id,
+          company_id: companyId,
           status: 'Active',
         },
         select: { id: true },
@@ -98,18 +93,14 @@ export class ProjectService {
   }
 
   async getAllProjects(userId: number, role: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { company_id: true },
-    });
-
+    const companyId = await this.ensureUserCompany(userId);
     let whereClause: any = {};
 
     if (role === 'Admin') {
-      whereClause = { company_id: user?.company_id };
+      whereClause = { company_id: companyId };
     } else {
       whereClause = {
-        company_id: user?.company_id,
+        company_id: companyId,
         projectmember: { some: { user_id: userId } },
       };
     }
@@ -541,6 +532,31 @@ export class ProjectService {
       overdue_tasks: overdue,
       completion_percent: total > 0 ? Math.round((completed / total) * 100) : 0,
     };
+  }
+
+  private async ensureUserCompany(userId: number): Promise<number> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, company_id: true },
+    });
+
+    if (!user) {
+      throw new NotFoundError('Không tìm thấy người dùng');
+    }
+
+    if (user.company_id) {
+      return user.company_id;
+    }
+
+    const company = await companyService.getCompany();
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { company_id: company.id },
+      select: { company_id: true },
+    });
+
+    return updated.company_id as number;
   }
 
   private async assertManagerOrAdmin(projectId: number, userId: number): Promise<void> {
