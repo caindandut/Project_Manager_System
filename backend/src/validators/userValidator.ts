@@ -1,12 +1,8 @@
 import { z } from 'zod';
 
-const roleEnum = z.enum(['Admin', 'Director', 'Employee'], {
-  errorMap: () => ({ message: 'Vai trò phải là Admin, Director hoặc Employee' }),
-});
+const roleEnum = z.enum(['Admin', 'Director', 'Employee']);
 
-const statusEnum = z.enum(['Active', 'Inactive', 'Pending'], {
-  errorMap: () => ({ message: 'Trạng thái phải là Active, Inactive hoặc Pending' }),
-});
+const statusEnum = z.enum(['Active', 'Inactive', 'Pending']);
 
 /** Mật khẩu mạnh: min 8 ký tự, có chữ in hoa, có ký tự đặc biệt */
 const strongPassword = z
@@ -18,7 +14,7 @@ const strongPassword = z
 /** Admin mời user — POST /api/users */
 export const createUserSchema = z.object({
   email: z
-    .string({ required_error: 'Vui lòng cung cấp email' })
+    .string()
     .min(1, 'Vui lòng cung cấp email')
     .email('Email không đúng định dạng')
     .max(255)
@@ -48,7 +44,7 @@ export const updateProfileSchema = z.object({
 
 /** Đổi mật khẩu — PUT /api/users/change-password */
 export const changePasswordSchema = z.object({
-  oldPassword: z.string({ required_error: 'Vui lòng nhập mật khẩu hiện tại' }).min(1, 'Vui lòng nhập mật khẩu hiện tại'),
+  oldPassword: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
   newPassword: strongPassword,
 }).refine((data) => data.oldPassword !== data.newPassword, {
   message: 'Mật khẩu mới phải khác mật khẩu hiện tại',
@@ -57,9 +53,9 @@ export const changePasswordSchema = z.object({
 
 /** Chấp nhận lời mời — POST /api/users/accept-invite */
 export const acceptInviteSchema = z.object({
-  token: z.string({ required_error: 'Thiếu token' }).min(1, 'Thiếu token'),
+  token: z.string().min(1, 'Thiếu token'),
   fullName: z
-    .string({ required_error: 'Vui lòng nhập họ tên' })
+    .string()
     .min(2, 'Họ tên phải có ít nhất 2 ký tự')
     .max(100)
     .transform((v) => v.trim()),

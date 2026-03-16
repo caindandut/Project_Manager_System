@@ -1,12 +1,8 @@
 import { z } from 'zod';
 
-const projectMemberRoleEnum = z.enum(['Manager', 'Member', 'Viewer'], {
-  errorMap: () => ({ message: 'Vai trò phải là Manager, Member hoặc Viewer' }),
-});
+const projectMemberRoleEnum = z.enum(['Manager', 'Member', 'Viewer']);
 
-const projectStatusEnum = z.enum(['Active', 'Completed', 'Archived'], {
-  errorMap: () => ({ message: 'Trạng thái phải là Active, Completed hoặc Archived' }),
-});
+const projectStatusEnum = z.enum(['Active', 'Completed', 'Archived']);
 
 const hexColor = z
   .string()
@@ -22,8 +18,8 @@ const dateString = z
 /** Tạo dự án — POST /api/projects */
 export const createProjectSchema = z.object({
   project_name: z
-    .string({ required_error: 'Vui lòng nhập tên dự án' })
-    .min(1, 'Tên dự án không được để trống')
+    .string()
+    .min(1, 'Vui lòng nhập tên dự án')
     .max(255, 'Tên dự án tối đa 255 ký tự')
     .transform((v) => v.trim()),
   description: z
@@ -73,7 +69,7 @@ export const updateProjectSchema = z.object({
 /** Thêm thành viên — POST /api/projects/:id/members */
 export const addMemberSchema = z.object({
   user_id: z
-    .number({ required_error: 'Vui lòng chọn người dùng' })
+    .number()
     .int('ID người dùng phải là số nguyên')
     .positive('ID người dùng không hợp lệ'),
   role: projectMemberRoleEnum.optional().default('Member'),
