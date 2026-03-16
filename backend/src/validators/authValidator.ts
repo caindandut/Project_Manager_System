@@ -3,19 +3,19 @@ import { z } from 'zod';
 /** Đăng nhập email/password */
 export const loginSchema = z.object({
   email: z
-    .string({ required_error: 'Vui lòng nhập email' })
+    .string()
     .min(1, 'Vui lòng nhập email')
     .email('Email không đúng định dạng')
     .transform((v) => v.trim().toLowerCase()),
   password: z
-    .string({ required_error: 'Vui lòng nhập mật khẩu' })
+    .string()
     .min(1, 'Vui lòng nhập mật khẩu'),
 });
 
 /** Quên mật khẩu — gửi email */
 export const forgotPasswordSchema = z.object({
   email: z
-    .string({ required_error: 'Vui lòng nhập email' })
+    .string()
     .min(1, 'Vui lòng nhập email')
     .email('Email không đúng định dạng')
     .transform((v) => v.trim().toLowerCase()),

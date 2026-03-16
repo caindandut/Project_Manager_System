@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/AppError';
 
 /** 404 - Route không tồn tại */
-export const notFound = (req: Request, res: Response, next: NextFunction): void => {
+export const notFound = (req: Request, _res: Response, next: NextFunction): void => {
   next(new AppError(`Không tìm thấy đường dẫn - ${req.originalUrl}`, 404));
 };
 
