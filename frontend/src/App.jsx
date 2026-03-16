@@ -12,6 +12,7 @@ import ProfilePage from '@/pages/ProfilePage';
 import SettingsPage from '@/pages/SettingsPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
+import ProjectsPage from '@/pages/ProjectsPage';
 
 
 function App() {
@@ -48,6 +49,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/projects"
+            element={
+              <ProtectedRoute>
+                <ProjectsPage />
               </ProtectedRoute>
             }
           />

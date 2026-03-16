@@ -19,7 +19,7 @@ const NAV_BY_ROLE = {
   Admin: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Dự án", icon: FolderKanban, href: "/projects", disabled: true },
+      { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Thành viên", icon: Users, href: "/members" },
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
     ],
@@ -30,7 +30,7 @@ const NAV_BY_ROLE = {
   Director: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Dự án", icon: FolderKanban, href: "/projects", disabled: true },
+      { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks", disabled: true },
       { label: "Thành viên", icon: Users, href: "/members" },
     ],
@@ -41,7 +41,7 @@ const NAV_BY_ROLE = {
   Employee: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Dự án", icon: FolderKanban, href: "/projects", disabled: true },
+      { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks", disabled: true },
     ],
     system: [
