@@ -13,6 +13,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
 import ProjectsPage from '@/pages/ProjectsPage';
+import ProjectDetailPage from '@/pages/ProjectDetailPage';
 
 
 function App() {
@@ -58,6 +59,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProjectsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/projects/:id"
+            element={
+              <ProtectedRoute>
+                <ProjectDetailPage />
               </ProtectedRoute>
             }
           />
