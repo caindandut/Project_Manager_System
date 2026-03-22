@@ -57,6 +57,7 @@ import {
   DEFAULT_PROJECT_COLOR,
   PRIORITY_OPTIONS,
 } from "@/constants/projectUi";
+import TaskListView from "@/components/task/TaskListView";
 
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
@@ -162,14 +163,20 @@ function OverviewTab({ project }) {
   );
 }
 
-// ─── Tab: Công việc (placeholder GĐ2) ──────────────────────
-function TasksTab() {
+// ─── Tab: Công việc (GĐ2 mục 2.7 — TaskListView) ───────────
+function TasksTab({ project, user, showToast }) {
+  const myRole = project?.members?.find((m) => m.id === user?.id)?.project_role;
+  const canEditTasks =
+    user?.role === "Admin" ||
+    user?.role === "Director" ||
+    (myRole && myRole !== "Viewer");
+
   return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <ClipboardList className="h-12 w-12 text-slate-300" />
-      <p className="mt-3 text-sm font-medium text-slate-500">Quản lý công việc sẽ được triển khai ở Giai đoạn 2</p>
-      <p className="mt-1 text-xs text-slate-400">Bao gồm: List View, Kanban Board, Task Detail</p>
-    </div>
+    <TaskListView
+      projectId={project.id}
+      showToast={showToast}
+      canEditTasks={canEditTasks}
+    />
   );
 }
 
@@ -654,7 +661,9 @@ export default function ProjectDetailPage() {
 
             {/* Tab Content */}
             {activeTab === "overview" && <OverviewTab project={project} />}
-            {activeTab === "tasks" && <TasksTab />}
+            {activeTab === "tasks" && (
+              <TasksTab project={project} user={user} showToast={showToast} />
+            )}
             {activeTab === "members" && <MembersTab project={project} canManage={canManage} onRefresh={fetchProject} showToast={showToast} />}
             {activeTab === "documents" && <DocumentsTab />}
             {activeTab === "settings" && canManage && <SettingsTab project={project} onRefresh={fetchProject} showToast={showToast} />}

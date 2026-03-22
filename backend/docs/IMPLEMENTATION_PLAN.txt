@@ -543,7 +543,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
       [ { value: 'Main', label: 'Chính' }, { value: 'Support', label: 'Hỗ trợ' } ]
 
 ────────────────────────────────────────────────────────────────────────────────
-2.7. [TẠO MỚI] frontend/src/components/task/TaskListView.jsx
+2.7. [ĐÃ CÓ] frontend/src/components/task/TaskListView.jsx
 ────────────────────────────────────────────────────────────────────────────────
 
   MỤC ĐÍCH: View mặc định — danh sách task group dạng accordion
