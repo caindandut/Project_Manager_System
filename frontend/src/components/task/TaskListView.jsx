@@ -39,9 +39,9 @@ import {
   GripVertical,
   Loader2,
   Plus,
-  X,
   Calendar,
 } from "lucide-react";
+import TaskDetailSlideOver from "@/components/task/TaskDetailSlideOver";
 import taskGroupApi from "@/api/taskGroupApi";
 import taskApi from "@/api/taskApi";
 import {
@@ -639,40 +639,11 @@ export default function TaskListView({
         </DialogContent>
       </Dialog>
 
-      {detailTask && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/30"
-            aria-label="Đóng"
-            onClick={() => setDetailTask(null)}
-          />
-          <div className="relative flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <h2 className="text-sm font-semibold text-slate-800">Chi tiết công việc</h2>
-              <Button variant="ghost" size="icon" onClick={() => setDetailTask(null)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 text-sm">
-              {detailLoading ? (
-                <Loader2 className="mx-auto mt-8 h-8 w-8 animate-spin text-blue-600" />
-              ) : (
-                <>
-                  <p className="text-lg font-medium text-slate-900">{detailTask.title}</p>
-                  <p className="mt-2 text-xs text-slate-500">ID #{detailTask.id}</p>
-                  {detailTask.description && (
-                    <p className="mt-4 whitespace-pre-wrap text-slate-600">{detailTask.description}</p>
-                  )}
-                  <p className="mt-4 text-xs text-slate-400">
-                    Giao diện đầy đủ (subtask, phụ thuộc, tài liệu…) sẽ bổ sung ở mục 2.9.
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <TaskDetailSlideOver
+        task={detailTask}
+        loading={detailLoading}
+        onClose={() => setDetailTask(null)}
+      />
     </div>
   );
 }

@@ -576,7 +576,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
   PACKAGES CẦN: @dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities
 
 ────────────────────────────────────────────────────────────────────────────────
-2.8. [TẠO MỚI] frontend/src/components/task/KanbanView.jsx
+2.8. [ĐÃ CÓ] frontend/src/components/task/KanbanView.jsx
 ────────────────────────────────────────────────────────────────────────────────
 
   MỤC ĐÍCH: Kanban board — cột = trạng thái, card = task

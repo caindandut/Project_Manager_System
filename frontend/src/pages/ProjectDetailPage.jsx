@@ -47,6 +47,8 @@ import {
   ClipboardList,
   Archive,
   Save,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import projectApi from "@/api/projectApi";
@@ -58,6 +60,7 @@ import {
   PRIORITY_OPTIONS,
 } from "@/constants/projectUi";
 import TaskListView from "@/components/task/TaskListView";
+import KanbanView from "@/components/task/KanbanView";
 
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
@@ -163,8 +166,9 @@ function OverviewTab({ project }) {
   );
 }
 
-// ─── Tab: Công việc (GĐ2 mục 2.7 — TaskListView) ───────────
+// ─── Tab: Công việc (GĐ2 mục 2.7 / 2.8) ────────────────────
 function TasksTab({ project, user, showToast }) {
+  const [taskView, setTaskView] = useState("list");
   const myRole = project?.members?.find((m) => m.id === user?.id)?.project_role;
   const canEditTasks =
     user?.role === "Admin" ||
@@ -172,11 +176,42 @@ function TasksTab({ project, user, showToast }) {
     (myRole && myRole !== "Viewer");
 
   return (
-    <TaskListView
-      projectId={project.id}
-      showToast={showToast}
-      canEditTasks={canEditTasks}
-    />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-slate-500">Chế độ xem:</span>
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+          <button
+            type="button"
+            onClick={() => setTaskView("list")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === "list" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
+          >
+            <List className="h-3.5 w-3.5" />
+            Danh sách
+          </button>
+          <button
+            type="button"
+            onClick={() => setTaskView("kanban")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === "kanban" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Kanban
+          </button>
+        </div>
+      </div>
+      {taskView === "list" ? (
+        <TaskListView
+          projectId={project.id}
+          showToast={showToast}
+          canEditTasks={canEditTasks}
+        />
+      ) : (
+        <KanbanView
+          projectId={project.id}
+          showToast={showToast}
+          canEditTasks={canEditTasks}
+        />
+      )}
+    </div>
   );
 }
 
