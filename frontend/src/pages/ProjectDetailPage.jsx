@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import projectApi from "@/api/projectApi";
+import taskGroupApi from "@/api/taskGroupApi";
 import LabelChipSelector from "@/components/project/LabelChipSelector";
 import { PriorityBadge, LabelBadges } from "@/components/project/ProjectBadges";
 import {
@@ -59,8 +60,16 @@ import {
   DEFAULT_PROJECT_COLOR,
   PRIORITY_OPTIONS,
 } from "@/constants/projectUi";
+import { TASK_LABEL_PRESETS } from "@/constants/taskUi";
 import TaskListView from "@/components/task/TaskListView";
 import KanbanView from "@/components/task/KanbanView";
+import TasksFilterBar from "@/components/task/TasksFilterBar";
+import {
+  filterTaskGroups,
+  collectLabelOptions,
+  hasActiveTaskFilters,
+  countTasksInGroups,
+} from "@/utils/taskFilters";
 
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
@@ -166,41 +175,112 @@ function OverviewTab({ project }) {
   );
 }
 
-// ─── Tab: Công việc (GĐ2 mục 2.7 / 2.8) ────────────────────
+// ─── Tab: Công việc (GĐ2 mục 2.10 — fetch + lọc + List/Kanban) ─
 function TasksTab({ project, user, showToast, canManage, onProjectRefresh }) {
   const [taskView, setTaskView] = useState("list");
+  const [taskGroups, setTaskGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [taskFilters, setTaskFilters] = useState({
+    status: "",
+    priority: "",
+    label: "",
+    assigneeId: "",
+    search: "",
+  });
+
   const myRole = project?.members?.find((m) => m.id === user?.id)?.project_role;
   const canEditTasks =
     user?.role === "Admin" ||
     user?.role === "Director" ||
     (myRole && myRole !== "Viewer");
 
+  const loadTaskGroups = useCallback(async () => {
+    setGroupsLoading(true);
+    try {
+      const res = await taskGroupApi.getByProject(project.id);
+      setTaskGroups(res.data.data || []);
+    } catch (err) {
+      showToast(
+        err.response?.data?.message || "Không tải được nhóm công việc",
+        "error",
+      );
+      setTaskGroups([]);
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [project.id, showToast]);
+
+  useEffect(() => {
+    loadTaskGroups();
+  }, [loadTaskGroups]);
+
+  const labelOptions = useMemo(
+    () => collectLabelOptions(taskGroups, TASK_LABEL_PRESETS),
+    [taskGroups],
+  );
+
+  const filteredGroups = useMemo(
+    () => filterTaskGroups(taskGroups, taskFilters),
+    [taskGroups, taskFilters],
+  );
+
+  const totalTasksInProject = useMemo(
+    () => countTasksInGroups(taskGroups),
+    [taskGroups],
+  );
+
+  const dragFiltered = hasActiveTaskFilters(taskFilters);
+
+  const patchFilters = (patch) =>
+    setTaskFilters((f) => ({ ...f, ...patch }));
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-slate-500">Chế độ xem:</span>
-        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-          <button
-            type="button"
-            onClick={() => setTaskView("list")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === "list" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
-          >
-            <List className="h-3.5 w-3.5" />
-            Danh sách
-          </button>
-          <button
-            type="button"
-            onClick={() => setTaskView("kanban")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === "kanban" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Kanban
-          </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">Chế độ xem:</span>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <button
+              type="button"
+              onClick={() => setTaskView("list")}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === "list" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
+            >
+              <List className="h-3.5 w-3.5" />
+              Danh sách
+            </button>
+            <button
+              type="button"
+              onClick={() => setTaskView("kanban")}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === "kanban" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Kanban
+            </button>
+          </div>
         </div>
+        {dragFiltered && (
+          <p className="text-[11px] text-amber-700">
+            Đang lọc: kéo thả sắp xếp tạm tắt để tránh lệch thứ tự với máy chủ.
+          </p>
+        )}
       </div>
+
+      <TasksFilterBar
+        filters={taskFilters}
+        onChange={patchFilters}
+        members={project.members || []}
+        labelOptions={labelOptions}
+      />
+
       {taskView === "list" ? (
         <TaskListView
           projectId={project.id}
+          groups={filteredGroups}
+          groupsFull={taskGroups}
+          groupsLoading={groupsLoading}
+          onReloadGroups={loadTaskGroups}
+          dragDisabled={dragFiltered}
+          totalTasksInProject={totalTasksInProject}
           showToast={showToast}
           canEditTasks={canEditTasks}
           canManageProject={canManage}
@@ -209,6 +289,11 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh }) {
       ) : (
         <KanbanView
           projectId={project.id}
+          groups={filteredGroups}
+          groupsFull={taskGroups}
+          groupsLoading={groupsLoading}
+          onReloadGroups={loadTaskGroups}
+          dragDisabled={dragFiltered}
           showToast={showToast}
           canEditTasks={canEditTasks}
           canManageProject={canManage}

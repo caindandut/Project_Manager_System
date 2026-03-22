@@ -662,16 +662,15 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
     - Attachments section: placeholder text chờ GĐ4
 
 ────────────────────────────────────────────────────────────────────────────────
-2.10. [SỬA] frontend/src/pages/ProjectDetailPage.jsx — Tab "Công việc"
+2.10. [ĐÃ CÓ] frontend/src/pages/ProjectDetailPage.jsx — Tab "Công việc"
 ────────────────────────────────────────────────────────────────────────────────
 
   THAY ĐỔI:
-    - Thay TasksTab placeholder ("Giai đoạn 2") bằng component thực
-    - Toggle button: ListView / KanbanView
-    - Filter bar: status, priority, label, assignee, search
-    - Data: fetch taskGroups khi tab active → pass vào ListView/KanbanView
-    - TaskDetailPanel: overlay (Sheet/Drawer) — state quản lý taskId đang mở
-    - Refresh data khi task thay đổi (callback từ panel/view)
+    - TasksTab: toggle List / Kanban; fetch taskGroups khi tab active (mount)
+    - TasksFilterBar + utils/taskFilters.js: status, priority, label, assignee, search
+    - Truyền groups đã lọc + groupsFull + onReloadGroups vào TaskListView / KanbanView
+    - Khi đang lọc: tắt kéo thả (dragDisabled); TaskDetailPanel trong từng view
+    - onTaskUpdated: refresh project + reload nhóm qua onReloadGroups
 
 ────────────────────────────────────────────────────────────────────────────────
 2.11. [TẠO MỚI] frontend/src/pages/MyTasksPage.jsx

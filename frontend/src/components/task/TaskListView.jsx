@@ -227,6 +227,7 @@ function GroupTaskList({
   onToggle,
   canEditTasks,
   savingDrag,
+  dragDisabled,
   quickTitle,
   setQuickTitle,
   onQuickAdd,
@@ -284,7 +285,7 @@ function GroupTaskList({
                   task={task}
                   groupId={group.id}
                   canEditTasks={canEditTasks}
-                  disabledDrag={savingDrag}
+                  disabledDrag={savingDrag || dragDisabled}
                   onTitleClick={onTitleClick}
                   onStatusChange={onStatusChange}
                   onCompleteClick={onCompleteClick}
@@ -333,13 +334,20 @@ function GroupTaskList({
  */
 export default function TaskListView({
   projectId,
+  /** Nhóm đã lọc — hiển thị */
+  groups = [],
+  /** Nhóm đầy đủ — dùng cho DnD / reorder API khi không lọc */
+  groupsFull,
+  groupsLoading = false,
+  onReloadGroups,
+  dragDisabled = false,
+  /** Còn task trong dự án (trước lọc) — UX thông báo */
+  totalTasksInProject = 0,
   showToast,
   canEditTasks = false,
   canManageProject = false,
   onTaskUpdated,
 }) {
-  const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [openMap, setOpenMap] = useState({});
   const [activeTask, setActiveTask] = useState(null);
   const [savingDrag, setSavingDrag] = useState(false);
@@ -358,47 +366,44 @@ export default function TaskListView({
     }),
   );
 
-  const refetch = useCallback(async () => {
-    const res = await taskGroupApi.getByProject(projectId);
-    const data = res.data.data || [];
-    setGroups(data);
+  /** Dữ liệu đầy đủ cho thao tác kéo thả / API (khi không lọc trùng với `groups`). */
+  const dndGroups = useMemo(
+    () => groupsFull ?? groups,
+    [groupsFull, groups],
+  );
+
+  const reload = useCallback(async () => {
+    if (onReloadGroups) {
+      await onReloadGroups();
+      return;
+    }
+    try {
+      const res = await taskGroupApi.getByProject(projectId);
+      const data = res.data.data || [];
+      setOpenMap((prev) => {
+        const next = { ...prev };
+        for (const g of data) {
+          if (next[g.id] === undefined) next[g.id] = true;
+        }
+        return next;
+      });
+    } catch (err) {
+      showToast(
+        err.response?.data?.message || "Không tải được nhóm công việc",
+        "error",
+      );
+    }
+  }, [onReloadGroups, projectId, showToast]);
+
+  useEffect(() => {
     setOpenMap((prev) => {
       const next = { ...prev };
-      for (const g of data) {
+      for (const g of groups || []) {
         if (next[g.id] === undefined) next[g.id] = true;
       }
       return next;
     });
-    return data;
-  }, [projectId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await taskGroupApi.getByProject(projectId);
-        if (cancelled) return;
-        const data = res.data.data || [];
-        setGroups(data);
-        const om = {};
-        for (const g of data) om[g.id] = true;
-        setOpenMap(om);
-      } catch (err) {
-        if (!cancelled) {
-          showToast(
-            err.response?.data?.message || "Không tải được nhóm công việc",
-            "error",
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, showToast]);
+  }, [groups]);
 
   const toggleGroup = (id) => {
     setOpenMap((m) => ({ ...m, [id]: !m[id] }));
@@ -416,7 +421,7 @@ export default function TaskListView({
       showToast("Đã tạo nhóm công việc");
       setNewGroupOpen(false);
       setNewGroupName("");
-      await refetch();
+      await reload();
     } catch (err) {
       showToast(err.response?.data?.message || "Không tạo được nhóm", "error");
     } finally {
@@ -431,7 +436,7 @@ export default function TaskListView({
       await taskApi.create(groupId, { title, priority: "Medium" });
       showToast("Đã thêm công việc");
       setQuickTitle((q) => ({ ...q, [groupId]: "" }));
-      await refetch();
+      await reload();
     } catch (err) {
       showToast(err.response?.data?.message || "Không tạo được task", "error");
     }
@@ -441,10 +446,10 @@ export default function TaskListView({
     try {
       await taskApi.updateStatus(task.id, status);
       showToast("Đã cập nhật trạng thái");
-      await refetch();
+      await reload();
     } catch (err) {
       showToast(err.response?.data?.message || "Không đổi được trạng thái", "error");
-      await refetch();
+      await reload();
     }
   };
 
@@ -452,10 +457,10 @@ export default function TaskListView({
     try {
       await taskApi.updateStatus(task.id, "Completed");
       showToast("Đã hoàn thành công việc");
-      await refetch();
+      await reload();
     } catch (err) {
       showToast(err.response?.data?.message || "Không cập nhật được", "error");
-      await refetch();
+      await reload();
     }
   };
 
@@ -470,10 +475,10 @@ export default function TaskListView({
 
   const handleDragEnd = async ({ active, over }) => {
     setActiveTask(null);
-    if (!over || savingDrag) return;
+    if (!over || savingDrag || dragDisabled || !canEditTasks) return;
 
     const activeId = active.id;
-    const sourceG = findGroupContainingTask(groups, activeId);
+    const sourceG = findGroupContainingTask(dndGroups, activeId);
     if (!sourceG) return;
 
     const overId = over.id;
@@ -484,11 +489,11 @@ export default function TaskListView({
 
     if (overStr.startsWith("drop-")) {
       targetGroupId = parseInt(overStr.slice(5), 10);
-      const tg = groups.find((g) => g.id === targetGroupId);
+      const tg = dndGroups.find((g) => g.id === targetGroupId);
       if (!tg) return;
       positionApi = tg.tasks.length;
     } else {
-      const tg = findGroupContainingTask(groups, overId);
+      const tg = findGroupContainingTask(dndGroups, overId);
       if (!tg) return;
       targetGroupId = tg.id;
       positionApi = tg.tasks.findIndex((t) => t.id === overId);
@@ -513,10 +518,10 @@ export default function TaskListView({
       try {
         await taskApi.reorder(sourceG.id, ordered_ids);
         showToast("Đã cập nhật thứ tự");
-        await refetch();
+        await reload();
       } catch (err) {
         showToast(err.response?.data?.message || "Không sắp xếp được", "error");
-        await refetch();
+        await reload();
       } finally {
         setSavingDrag(false);
       }
@@ -530,16 +535,16 @@ export default function TaskListView({
         position: positionApi,
       });
       showToast("Đã chuyển nhóm công việc");
-      await refetch();
+      await reload();
     } catch (err) {
       showToast(err.response?.data?.message || "Không di chuyển được", "error");
-      await refetch();
+      await reload();
     } finally {
       setSavingDrag(false);
     }
   };
 
-  if (loading) {
+  if (groupsLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-slate-500">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -547,6 +552,8 @@ export default function TaskListView({
       </div>
     );
   }
+
+  const listEmpty = (groups || []).every((g) => !(g.tasks || []).length);
 
   return (
     <div className="space-y-3">
@@ -564,6 +571,7 @@ export default function TaskListView({
             onToggle={() => toggleGroup(g.id)}
             canEditTasks={canEditTasks}
             savingDrag={savingDrag}
+            dragDisabled={dragDisabled}
             quickTitle={quickTitle}
             setQuickTitle={setQuickTitle}
             onQuickAdd={handleQuickAdd}
@@ -594,9 +602,14 @@ export default function TaskListView({
         </Button>
       )}
 
-      {!canEditTasks && groups.length === 0 && (
+      {listEmpty && totalTasksInProject === 0 && (
         <p className="py-8 text-center text-sm text-slate-500">
-          Chưa có nhóm công việc. Liên hệ quản lý dự án để thiết lập.
+          Chưa có công việc trong dự án. {canEditTasks ? "Thêm nhóm và task ở trên." : "Liên hệ quản lý dự án."}
+        </p>
+      )}
+      {listEmpty && totalTasksInProject > 0 && (
+        <p className="py-8 text-center text-sm text-amber-700">
+          Không có công việc khớp bộ lọc. Thử xóa lọc hoặc đổi điều kiện.
         </p>
       )}
 
@@ -636,8 +649,8 @@ export default function TaskListView({
         showToast={showToast}
         canEditTasks={canEditTasks}
         canManageProject={canManageProject}
-        onTaskUpdated={() => {
-          refetch();
+        onTaskUpdated={async () => {
+          await reload();
           onTaskUpdated?.();
         }}
       />

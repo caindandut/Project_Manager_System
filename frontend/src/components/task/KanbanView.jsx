@@ -220,6 +220,7 @@ function KanbanColumn({
   onAdd,
   onCardClick,
   savingDrag,
+  dragDisabled,
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `col-${status}`,
@@ -289,25 +290,29 @@ function KanbanColumn({
  */
 export default function KanbanView({
   projectId,
+  /** Nhóm đã lọc — chỉ task gốc đưa vào cột */
+  groups = [],
+  groupsFull,
+  groupsLoading = false,
+  onReloadGroups,
+  dragDisabled = false,
   showToast,
   canEditTasks = false,
   canManageProject = false,
   onTaskUpdated,
 }) {
-  const [groups, setGroups] = useState([]);
   const [columns, setColumns] = useState({
     Todo: [],
     InProgress: [],
     Review: [],
     Completed: [],
   });
-  const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState(null);
   const [savingDrag, setSavingDrag] = useState(false);
   const [addValue, setAddValue] = useState({});
   const [selectedTaskId, setSelectedTaskId] = useState(null);
 
-  const defaultGroupId = groups[0]?.id;
+  const defaultGroupId = (groupsFull && groupsFull[0]?.id) || groups[0]?.id;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -318,39 +323,20 @@ export default function KanbanView({
     setColumns(bucketByColumn(roots));
   }, []);
 
-  const refetch = useCallback(async () => {
+  useEffect(() => {
+    applyGroupsToColumns(groups || []);
+  }, [groups, applyGroupsToColumns]);
+
+  const reload = useCallback(async () => {
+    if (onReloadGroups) {
+      await onReloadGroups();
+      return;
+    }
     const res = await taskGroupApi.getByProject(projectId);
     const data = res.data.data || [];
-    setGroups(data);
     applyGroupsToColumns(data);
     return data;
-  }, [projectId, applyGroupsToColumns]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await taskGroupApi.getByProject(projectId);
-        if (cancelled) return;
-        const data = res.data.data || [];
-        setGroups(data);
-        applyGroupsToColumns(data);
-      } catch (err) {
-        if (!cancelled) {
-          showToast(
-            err.response?.data?.message || "Không tải được công việc",
-            "error",
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, showToast, applyGroupsToColumns]);
+  }, [onReloadGroups, projectId, applyGroupsToColumns]);
 
   const openDetail = (task) => {
     setSelectedTaskId(task.id);
@@ -372,14 +358,14 @@ export default function KanbanView({
       }
       showToast("Đã thêm công việc");
       setAddValue((m) => ({ ...m, [targetColumnStatus]: "" }));
-      await refetch();
+      await reload();
     } catch (err) {
       showToast(
         err.response?.data?.message ||
           "Không tạo được task hoặc không đủ quyền đổi trạng thái (vd. Hoàn thành)",
         "error",
       );
-      await refetch();
+      await reload();
     }
   };
 
@@ -390,7 +376,7 @@ export default function KanbanView({
 
   const handleDragEnd = async ({ active, over }) => {
     setActiveTask(null);
-    if (!over || savingDrag || !canEditTasks) return;
+    if (!over || savingDrag || !canEditTasks || dragDisabled) return;
 
     const activeTaskRef = active.data.current?.task;
     if (!activeTaskRef) return;
@@ -431,20 +417,20 @@ export default function KanbanView({
     try {
       await taskApi.updateStatus(active.id, targetColumn);
       showToast("Đã cập nhật trạng thái");
-      await refetch();
+      await reload();
     } catch (err) {
       showToast(
         err.response?.data?.message ||
           "Không thể chuyển trạng thái (kiểm tra luồng: Todo → Đang làm → …)",
         "error",
       );
-      await refetch();
+      await reload();
     } finally {
       setSavingDrag(false);
     }
   };
 
-  if (loading) {
+  if (groupsLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-slate-500">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -479,6 +465,7 @@ export default function KanbanView({
               onAdd={handleAdd}
               onCardClick={openDetail}
               savingDrag={savingDrag}
+              dragDisabled={dragDisabled}
             />
           ))}
         </div>
@@ -498,8 +485,8 @@ export default function KanbanView({
         showToast={showToast}
         canEditTasks={canEditTasks}
         canManageProject={canManageProject}
-        onTaskUpdated={() => {
-          refetch();
+        onTaskUpdated={async () => {
+          await reload();
           onTaskUpdated?.();
         }}
       />
