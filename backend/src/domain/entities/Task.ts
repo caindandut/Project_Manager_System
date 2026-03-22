@@ -1,3 +1,14 @@
+import { ValidationError } from '../../utils/AppError';
+
+/** Đồng bộ Prisma enum `task_priority` */
+export enum TaskPriority {
+  LOW = 'Low',
+  MEDIUM = 'Medium',
+  HIGH = 'High',
+  URGENT = 'Urgent',
+}
+
+/** Đồng bộ Prisma enum `task_status` */
 export enum TaskStatus {
   TODO = 'Todo',
   IN_PROGRESS = 'InProgress',
@@ -6,12 +17,13 @@ export enum TaskStatus {
   OVERDUE = 'Overdue',
 }
 
-export enum TaskPriority {
-  LOW = 'Low',
-  MEDIUM = 'Medium',
-  HIGH = 'High',
-  URGENT = 'Urgent',
-}
+const ALLOWED_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
+  [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS],
+  [TaskStatus.IN_PROGRESS]: [TaskStatus.REVIEW, TaskStatus.TODO],
+  [TaskStatus.REVIEW]: [TaskStatus.COMPLETED, TaskStatus.IN_PROGRESS],
+  [TaskStatus.COMPLETED]: [],
+  [TaskStatus.OVERDUE]: [TaskStatus.IN_PROGRESS, TaskStatus.REVIEW],
+};
 
 export interface TaskProps {
   id: number;
@@ -20,225 +32,127 @@ export interface TaskProps {
   parentTaskId: number | null;
   creatorId: number | null;
   title: string;
-  description?: string | null;
-  deadline?: Date | null;
-  priority?: TaskPriority;
-  status?: TaskStatus;
-  completionPercent?: number | null;
-  position?: number | null;
-  isArchived?: boolean | null;
-  createdAt?: Date | null;
-  updatedAt?: Date | null;
+  /** Nhãn kỹ thuật cấp task (Backend, Design…) — khác label project */
+  label: string | null;
+  description: string | null;
+  deadline: Date | null;
+  priority: TaskPriority | null;
+  status: TaskStatus | null;
+  completionPercent: number;
+  position: number | null;
+  isArchived: boolean;
+  createdAt: Date | null;
+  updatedAt: Date | null;
 }
 
-/**
- * Task domain entity.
- * Đóng gói rule về trạng thái, % hoàn thành, deadline.
- */
 export class Task {
-  private _id: number;
-  private _projectId: number | null;
-  private _taskGroupId: number | null;
-  private _parentTaskId: number | null;
-  private _creatorId: number | null;
-  private _title: string;
-  private _description: string | null;
-  private _deadline: Date | null;
-  private _priority: TaskPriority;
-  private _status: TaskStatus;
-  private _completionPercent: number;
-  private _position: number | null;
-  private _isArchived: boolean;
-  private _createdAt: Date | null;
-  private _updatedAt: Date | null;
+  private readonly _id: number;
+  private readonly _projectId: number | null;
+  private readonly _taskGroupId: number | null;
+  private readonly _parentTaskId: number | null;
+  private readonly _creatorId: number | null;
+  private readonly _title: string;
+  private readonly _label: string | null;
+  private readonly _description: string | null;
+  private readonly _deadline: Date | null;
+  private readonly _priority: TaskPriority | null;
+  private readonly _status: TaskStatus | null;
+  private readonly _completionPercent: number;
+  private readonly _position: number | null;
+  private readonly _isArchived: boolean;
+  private readonly _createdAt: Date | null;
+  private readonly _updatedAt: Date | null;
 
   constructor(props: TaskProps) {
     this._id = props.id;
-    this._projectId = props.projectId ?? null;
-    this._taskGroupId = props.taskGroupId ?? null;
-    this._parentTaskId = props.parentTaskId ?? null;
-    this._creatorId = props.creatorId ?? null;
-    this._title = props.title.trim();
-    this._description = props.description ?? null;
-    this._deadline = props.deadline ?? null;
-    this._priority = props.priority ?? TaskPriority.MEDIUM;
-    this._status = props.status ?? TaskStatus.TODO;
-    this._completionPercent = props.completionPercent ?? 0;
-    this._position = props.position ?? 0;
-    this._isArchived = props.isArchived ?? false;
-    this._createdAt = props.createdAt ?? null;
-    this._updatedAt = props.updatedAt ?? null;
-
-    this.ensureValidTitle();
-    this.ensureValidCompletionPercent();
+    this._projectId = props.projectId;
+    this._taskGroupId = props.taskGroupId;
+    this._parentTaskId = props.parentTaskId;
+    this._creatorId = props.creatorId;
+    this._title = props.title;
+    this._label = props.label;
+    this._description = props.description;
+    this._deadline = props.deadline;
+    this._priority = props.priority;
+    this._status = props.status;
+    this._completionPercent = props.completionPercent;
+    this._position = props.position;
+    this._isArchived = props.isArchived;
+    this._createdAt = props.createdAt;
+    this._updatedAt = props.updatedAt;
   }
 
   get id(): number {
     return this._id;
   }
-
   get projectId(): number | null {
     return this._projectId;
   }
-
   get taskGroupId(): number | null {
     return this._taskGroupId;
   }
-
   get parentTaskId(): number | null {
     return this._parentTaskId;
   }
-
   get creatorId(): number | null {
     return this._creatorId;
   }
-
   get title(): string {
     return this._title;
   }
-
+  get label(): string | null {
+    return this._label;
+  }
   get description(): string | null {
     return this._description;
   }
-
   get deadline(): Date | null {
     return this._deadline;
   }
-
-  get priority(): TaskPriority {
+  get priority(): TaskPriority | null {
     return this._priority;
   }
-
-  get status(): TaskStatus {
+  get status(): TaskStatus | null {
     return this._status;
   }
-
   get completionPercent(): number {
     return this._completionPercent;
   }
-
   get position(): number | null {
     return this._position;
   }
-
   get isArchived(): boolean {
     return this._isArchived;
   }
-
   get createdAt(): Date | null {
     return this._createdAt;
   }
-
   get updatedAt(): Date | null {
     return this._updatedAt;
   }
 
-  private ensureValidTitle(): void {
-    if (!this._title) {
-      throw new Error('Tiêu đề công việc không được để trống');
+  static assertStatusTransition(from: TaskStatus, to: TaskStatus): void {
+    const allowed = ALLOWED_TRANSITIONS[from];
+    if (!allowed.includes(to)) {
+      throw new ValidationError(`Không thể chuyển trạng thái từ ${from} sang ${to}`);
     }
   }
 
-  private ensureValidCompletionPercent(): void {
-    if (this._completionPercent < 0 || this._completionPercent > 100) {
-      throw new Error('Phần trăm hoàn thành phải nằm trong khoảng 0-100');
+  static assertProgress(percent: number): void {
+    if (percent < 0 || percent > 100 || !Number.isFinite(percent)) {
+      throw new ValidationError('Tiến độ phải từ 0 đến 100');
     }
   }
 
-  /**
-   * Cập nhật tiêu đề task.
-   */
-  rename(newTitle: string): void {
-    this._title = newTitle.trim();
-    this.ensureValidTitle();
-  }
-
-  /**
-   * Cập nhật mô tả.
-   */
-  updateDescription(description: string | null): void {
-    this._description = description ?? null;
-  }
-
-  /**
-   * Cập nhật deadline.
-   */
-  updateDeadline(deadline: Date | null): void {
-    this._deadline = deadline ?? null;
-  }
-
-  /**
-   * Cập nhật độ ưu tiên.
-   */
-  updatePriority(priority: TaskPriority): void {
-    this._priority = priority;
-  }
-
-  /**
-   * Cập nhật trạng thái theo flow:
-   * Todo -> InProgress -> Review -> Completed.
-   * Không cho nhảy cóc (VD: Todo -> Completed).
-   */
-  updateStatus(newStatus: TaskStatus): void {
-    if (this._status === newStatus) return;
-
-    const validTransitions: Record<TaskStatus, TaskStatus[]> = {
-      [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS],
-      [TaskStatus.IN_PROGRESS]: [TaskStatus.REVIEW, TaskStatus.TODO],
-      [TaskStatus.REVIEW]: [TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED],
-      [TaskStatus.COMPLETED]: [TaskStatus.COMPLETED],
-      [TaskStatus.OVERDUE]: [TaskStatus.IN_PROGRESS, TaskStatus.REVIEW, TaskStatus.COMPLETED],
-    };
-
-    const allowed = validTransitions[this._status] || [];
-    if (!allowed.includes(newStatus)) {
-      throw new Error(`Không cho phép chuyển trạng thái từ ${this._status} sang ${newStatus}`);
-    }
-
-    this._status = newStatus;
-  }
-
-  /**
-   * Cập nhật % hoàn thành.
-   * - Giới hạn 0-100.
-   * - Nếu % tăng lên 100, tự động chuyển trạng thái sang Completed (nếu chưa Archived).
-   * - Không cho giảm % nếu task đã Completed.
-   */
-  updateCompletionPercent(percent: number): void {
-    if (percent < 0 || percent > 100) {
-      throw new Error('Phần trăm hoàn thành phải nằm trong khoảng 0-100');
-    }
-
-    if (this._status === TaskStatus.COMPLETED && percent < this._completionPercent) {
-      throw new Error('Không thể giảm % hoàn thành của công việc đã hoàn thành');
-    }
-
-    this._completionPercent = percent;
-
-    if (percent === 100 && this._status !== TaskStatus.COMPLETED && !this._isArchived) {
-      this._status = TaskStatus.COMPLETED;
-    }
-  }
-
-  /**
-   * Đánh dấu task đã được lưu trữ.
-   * Chỉ cho phép archive khi đã Completed (quy tắc này đảm bảo inside entity).
-   */
-  archive(): void {
-    if (this._status !== TaskStatus.COMPLETED) {
-      throw new Error('Chỉ có thể lưu trữ công việc khi đã hoàn thành');
-    }
-    this._isArchived = true;
-  }
-
-  /**
-   * Kiểm tra task đã quá hạn hay chưa (deadline < hôm nay và chưa Completed/Archived).
-   * Nếu quá hạn, có thể dùng ở layer ngoài để cập nhật status -> Overdue.
-   */
-  isOverdue(referenceDate: Date = new Date()): boolean {
-    if (!this._deadline) return false;
-    if (this._status === TaskStatus.COMPLETED || this._isArchived) return false;
-    return this._deadline < referenceDate;
+  static isOverdue(
+    deadline: Date | string | null | undefined,
+    status: TaskStatus | string | null | undefined,
+    isArchived?: boolean | null,
+  ): boolean {
+    if (isArchived) return false;
+    const s = status as string;
+    if (s === TaskStatus.COMPLETED || s === 'Completed') return false;
+    if (!deadline) return false;
+    return new Date(deadline) < new Date();
   }
 }
-

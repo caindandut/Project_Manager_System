@@ -50,7 +50,13 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import projectApi from "@/api/projectApi";
-import userApi from "@/api/userApi";
+import LabelChipSelector from "@/components/project/LabelChipSelector";
+import { PriorityBadge, LabelBadges } from "@/components/project/ProjectBadges";
+import {
+  COLOR_PRESETS,
+  DEFAULT_PROJECT_COLOR,
+  PRIORITY_OPTIONS,
+} from "@/constants/projectUi";
 
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
@@ -62,7 +68,6 @@ const STATUS_BADGE = {
   Archived: { label: "Lưu trữ", className: "bg-slate-100 text-slate-500 border-slate-200" },
 };
 const MEMBER_ROLE_LABEL = { Manager: "Quản lý", Member: "Thành viên", Viewer: "Quan sát" };
-const COLOR_PRESETS = ["#2563EB","#059669","#D97706","#DC2626","#7C3AED","#0891B2","#DB2777","#4F46E5"];
 
 function getInitials(n) { return (n||"U").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(); }
 function fmtDate(d) { if(!d) return "—"; return new Date(d).toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}); }
@@ -120,10 +125,10 @@ function OverviewTab({ project }) {
         <CardContent className="p-5">
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="font-medium text-slate-700">Tiến độ tổng thể</span>
-            <span className="font-semibold" style={{ color: project.color_code || "#2563EB" }}>{pct}%</span>
+            <span className="font-semibold" style={{ color: project.color_code || DEFAULT_PROJECT_COLOR }}>{pct}%</span>
           </div>
           <div className="h-2.5 w-full rounded-full bg-slate-100">
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: project.color_code || "#2563EB" }} />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: project.color_code || DEFAULT_PROJECT_COLOR }} />
           </div>
         </CardContent>
       </Card>
@@ -133,11 +138,17 @@ function OverviewTab({ project }) {
           <h3 className="mb-3 font-semibold text-slate-900">Thông tin dự án</h3>
           <dl className="grid gap-3 sm:grid-cols-2 text-sm">
             <div><dt className="text-slate-500">Trạng thái</dt><dd><Badge className={STATUS_BADGE[project.status]?.className}>{STATUS_BADGE[project.status]?.label}</Badge></dd></div>
+            <div><dt className="text-slate-500">Độ ưu tiên</dt><dd><PriorityBadge priority={project.priority} /></dd></div>
             <div><dt className="text-slate-500">Manager</dt><dd className="font-medium text-slate-900">{project.manager?.full_name || "—"}</dd></div>
             <div><dt className="text-slate-500">Ngày bắt đầu</dt><dd className="text-slate-900">{fmtDate(project.start_date)}</dd></div>
             <div><dt className="text-slate-500">Ngày kết thúc</dt><dd className="text-slate-900">{fmtDate(project.end_date)}</dd></div>
-            {project.label && <div><dt className="text-slate-500">Nhãn</dt><dd><Badge variant="outline">{project.label}</Badge></dd></div>}
             <div><dt className="text-slate-500">Ngày tạo</dt><dd className="text-slate-900">{fmtDate(project.created_at)}</dd></div>
+            {project.label && (
+              <div className="sm:col-span-2">
+                <dt className="text-slate-500 mb-1">Nhãn phân loại</dt>
+                <dd className="flex flex-wrap gap-1.5"><LabelBadges label={project.label} /></dd>
+              </div>
+            )}
           </dl>
           {project.description && (
             <div className="mt-4 border-t pt-4">
@@ -174,7 +185,6 @@ function MembersTab({ project, canManage, onRefresh, showToast }) {
   const [removing, setRemoving] = useState(false);
 
   const members = project.members || [];
-  const memberIds = new Set(members.map((m) => m.id));
 
   const openAddDialog = async () => {
     setAddOpen(true);
@@ -182,10 +192,15 @@ function MembersTab({ project, canManage, onRefresh, showToast }) {
     setAddUserId("");
     setAddRole("Member");
     try {
-      const res = await userApi.getAll();
-      const all = res.data.data || [];
-      setCompanyUsers(all.filter((u) => u.status === "Active" && !memberIds.has(u.id)));
-    } catch { setCompanyUsers([]); }
+      const res = await projectApi.getMemberCandidates(project.id);
+      setCompanyUsers(res.data.data || []);
+    } catch (err) {
+      setCompanyUsers([]);
+      setAddError(
+        err.response?.data?.message ||
+          "Không tải được danh sách nhân viên. Bạn cần quyền quản lý dự án hoặc thử lại sau."
+      );
+    }
   };
 
   const handleAddMember = async () => {
@@ -311,9 +326,11 @@ function MembersTab({ project, canManage, onRefresh, showToast }) {
               <Select value={addUserId} onValueChange={setAddUserId}>
                 <SelectTrigger><SelectValue placeholder="Chọn người dùng..." /></SelectTrigger>
                 <SelectContent>
-                  {companyUsers.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-slate-500">Không có người dùng khả dụng</div>
-                  ) : companyUsers.map((u) => (
+                  {companyUsers.length === 0 && !addError ? (
+                    <div className="px-3 py-2 text-sm text-slate-500">
+                      Không còn nhân viên nào trong công ty để thêm (đã tham gia dự án hoặc chưa Active).
+                    </div>
+                  ) : companyUsers.length === 0 ? null : companyUsers.map((u) => (
                     <SelectItem key={u.id} value={String(u.id)}>{u.full_name || u.email}</SelectItem>
                   ))}
                 </SelectContent>
@@ -371,25 +388,47 @@ function DocumentsTab() {
   );
 }
 
+function projectToSettingsForm(p) {
+  return {
+    project_name: p.project_name || "",
+    description: p.description || "",
+    start_date: p.start_date ? new Date(p.start_date).toISOString().split("T")[0] : "",
+    end_date: p.end_date ? new Date(p.end_date).toISOString().split("T")[0] : "",
+    color_code: p.color_code || DEFAULT_PROJECT_COLOR,
+    label: p.label || "",
+    priority: p.priority || "Medium",
+  };
+}
+
 // ─── Tab: Cài đặt ───────────────────────────────────────────
 function SettingsTab({ project, onRefresh, showToast }) {
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    project_name: project.project_name || "",
-    description: project.description || "",
-    start_date: project.start_date ? new Date(project.start_date).toISOString().split("T")[0] : "",
-    end_date: project.end_date ? new Date(project.end_date).toISOString().split("T")[0] : "",
-    color_code: project.color_code || "#2563EB",
-    label: project.label || "",
-  });
+  const [form, setForm] = useState(() => projectToSettingsForm(project));
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [error, setError] = useState("");
+  const [chipHint, setChipHint] = useState("");
+
+  useEffect(() => {
+    setForm(projectToSettingsForm(project));
+    setError("");
+    setChipHint("");
+  }, [
+    project.id,
+    project.project_name,
+    project.description,
+    project.start_date,
+    project.end_date,
+    project.color_code,
+    project.label,
+    project.priority,
+  ]);
 
   const handleSave = async (e) => {
     e.preventDefault();
     setError("");
+    setChipHint("");
     if (!form.project_name.trim()) { setError("Tên dự án không được để trống"); return; }
     if (form.start_date && form.end_date && new Date(form.end_date) <= new Date(form.start_date)) {
       setError("Ngày kết thúc phải sau ngày bắt đầu"); return;
@@ -426,6 +465,7 @@ function SettingsTab({ project, onRefresh, showToast }) {
           <h3 className="mb-4 font-semibold text-slate-900">Thông tin dự án</h3>
           <form onSubmit={handleSave} className="space-y-4">
             {error && <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
+            {chipHint && <p className="text-xs text-amber-600">{chipHint}</p>}
             <div className="space-y-2">
               <Label htmlFor="s-name">Tên dự án *</Label>
               <Input id="s-name" value={form.project_name} onChange={(e) => setForm({ ...form, project_name: e.target.value })} />
@@ -444,17 +484,37 @@ function SettingsTab({ project, onRefresh, showToast }) {
                 <Input id="s-ed" type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Màu nhận diện</Label>
-              <div className="flex gap-2">
-                {COLOR_PRESETS.map((c) => (
-                  <button key={c} type="button" onClick={() => setForm({ ...form, color_code: c })} className={`h-8 w-8 rounded-full border-2 transition-all ${form.color_code === c ? "border-slate-900 scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} />
-                ))}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Màu nhận diện</Label>
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_PRESETS.map((c) => (
+                    <button key={c} type="button" onClick={() => setForm({ ...form, color_code: c })} className={`h-8 w-8 rounded-full border-2 transition-all ${form.color_code === c ? "border-slate-900 scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Độ ưu tiên</Label>
+                <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITY_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="s-label">Nhãn phân loại</Label>
-              <Input id="s-label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="VD: Frontend, Backend" />
+              <Label>Nhãn phân loại dự án</Label>
+              <p className="text-xs text-slate-400">Chọn nhãn mô tả tính chất vĩ mô của dự án</p>
+              <LabelChipSelector
+                value={form.label}
+                onChange={(v) => setForm({ ...form, label: v })}
+                onLimitWarning={setChipHint}
+              />
             </div>
             <div className="flex justify-end">
               <Button type="submit" className="gap-2 bg-blue-600 hover:bg-blue-700" disabled={saving}>
@@ -554,13 +614,18 @@ export default function ProjectDetailPage() {
               </button>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-2 rounded-full" style={{ backgroundColor: project.color_code || "#2563EB" }} />
+                  <div className="h-10 w-2 rounded-full" style={{ backgroundColor: project.color_code || DEFAULT_PROJECT_COLOR }} />
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h1 className="text-2xl font-bold text-slate-900">{project.project_name}</h1>
-                      {project.label && <Badge variant="outline">{project.label}</Badge>}
+                      <PriorityBadge priority={project.priority} />
                       <Badge className={STATUS_BADGE[project.status]?.className}>{STATUS_BADGE[project.status]?.label}</Badge>
                     </div>
+                    {project.label && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        <LabelBadges label={project.label} />
+                      </div>
+                    )}
                     <div className="mt-1 flex items-center gap-4 text-sm text-slate-500">
                       {(project.start_date || project.end_date) && (
                         <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{fmtDate(project.start_date)} → {fmtDate(project.end_date)}</span>

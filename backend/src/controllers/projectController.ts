@@ -54,6 +54,14 @@ export const getProjectMembers = asyncHandler(async (req: Request | any, res: Re
   res.status(200).json({ success: true, message: 'Lấy danh sách thành viên thành công', data });
 });
 
+export const getMemberCandidates = asyncHandler(async (req: Request | any, res: Response) => {
+  const actorId = req.user?.id;
+  if (!actorId) throw new UnauthorizedError();
+  const projectId = parseId(req.params.id, 'ID dự án');
+  const data = await projectService.getMemberCandidates(projectId, actorId);
+  res.status(200).json({ success: true, message: 'Lấy danh sách ứng viên thành công', data });
+});
+
 export const addProjectMember = asyncHandler(async (req: Request | any, res: Response) => {
   const userId = req.user?.id;
   if (!userId) throw new UnauthorizedError();

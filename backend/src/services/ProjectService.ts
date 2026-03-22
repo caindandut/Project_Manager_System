@@ -1,4 +1,4 @@
-import { projectmember_role, project_status } from '@prisma/client';
+import { projectmember_role, project_status, project_priority } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import {
   NotFoundError,
@@ -12,6 +12,7 @@ import type {
   UpdateMemberRoleInput,
 } from '../validators/projectValidator';
 import { companyService } from './CompanyService';
+import { Project as ProjectDomain } from '../domain/entities/Project';
 
 export class ProjectService {
   async createProject(input: CreateProjectInput, userId: number) {
@@ -28,11 +29,7 @@ export class ProjectService {
       throw new ValidationError('Tên dự án đã tồn tại trong công ty');
     }
 
-    if (input.start_date && input.end_date) {
-      if (new Date(input.end_date) <= new Date(input.start_date)) {
-        throw new ValidationError('Ngày kết thúc phải sau ngày bắt đầu');
-      }
-    }
+    ProjectDomain.assertDateOrder(input.start_date, input.end_date);
 
     const project = await prisma.project.create({
       data: {
@@ -44,6 +41,7 @@ export class ProjectService {
         end_date: input.end_date ? new Date(input.end_date) : null,
         color_code: input.color_code ?? '#2563EB',
         label: input.label ?? null,
+        priority: (input.priority as project_priority) ?? 'Medium',
         status: 'Active',
       },
     });
@@ -137,6 +135,7 @@ export class ProjectService {
           end_date: p.end_date,
           color_code: p.color_code,
           label: p.label,
+          priority: p.priority,
           status: p.status,
           created_at: p.created_at,
           manager: p.user,
@@ -207,6 +206,7 @@ export class ProjectService {
       end_date: project.end_date,
       color_code: project.color_code,
       label: project.label,
+      priority: project.priority,
       status: project.status,
       created_at: project.created_at,
       manager: project.user,
@@ -224,17 +224,23 @@ export class ProjectService {
   async updateProject(projectId: number, input: UpdateProjectInput, userId: number) {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, manager_id: true, project_name: true, company_id: true },
+      select: {
+        id: true,
+        manager_id: true,
+        project_name: true,
+        company_id: true,
+        start_date: true,
+        end_date: true,
+      },
     });
     if (!project) throw new NotFoundError('Không tìm thấy dự án');
 
     await this.assertManagerOrAdmin(projectId, userId);
 
-    if (input.start_date && input.end_date) {
-      if (new Date(input.end_date) <= new Date(input.start_date)) {
-        throw new ValidationError('Ngày kết thúc phải sau ngày bắt đầu');
-      }
-    }
+    const effectiveStart =
+      input.start_date !== undefined ? input.start_date : project.start_date;
+    const effectiveEnd = input.end_date !== undefined ? input.end_date : project.end_date;
+    ProjectDomain.assertDateOrder(effectiveStart, effectiveEnd);
 
     if (input.project_name && input.project_name !== project.project_name) {
       const duplicate = await prisma.project.findFirst({
@@ -263,6 +269,7 @@ export class ProjectService {
         }),
         ...(input.color_code !== undefined && { color_code: input.color_code }),
         ...(input.label !== undefined && { label: input.label }),
+        ...(input.priority !== undefined && { priority: input.priority as project_priority }),
         ...(input.status !== undefined && { status: input.status as project_status }),
       },
     });
@@ -340,6 +347,48 @@ export class ProjectService {
       project_role: m.role,
       joined_at: m.joined_at,
     }));
+  }
+
+  /**
+   * Người có thể thêm vào dự án: Active, cùng company_id với dự án, chưa trong project.
+   * Admin hoặc Manager dự án mới gọi được (không dùng GET /users — route đó chỉ Admin).
+   */
+  async getMemberCandidates(projectId: number, actorId: number) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, company_id: true },
+    });
+    if (!project) throw new NotFoundError('Không tìm thấy dự án');
+
+    await this.assertManagerOrAdmin(projectId, actorId);
+
+    if (project.company_id == null) {
+      return [];
+    }
+
+    const existing = await prisma.projectmember.findMany({
+      where: { project_id: projectId },
+      select: { user_id: true },
+    });
+    const excludeIds = existing.map((e) => e.user_id);
+
+    const users = await prisma.user.findMany({
+      where: {
+        company_id: project.company_id,
+        status: 'Active',
+        ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
+      },
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        role: true,
+        status: true,
+      },
+      orderBy: [{ full_name: 'asc' }, { email: 'asc' }],
+    });
+
+    return users;
   }
 
   async addProjectMember(projectId: number, input: AddMemberInput, actorId: number) {

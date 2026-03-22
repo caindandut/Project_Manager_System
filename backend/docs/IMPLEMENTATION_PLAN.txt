@@ -1,7 +1,7 @@
 ================================================================================
        KẾ HOẠCH TRIỂN KHAI DỰ ÁN - PROJECT MANAGEMENT SYSTEM
                (Phân tích chi tiết từng file sửa/tạo mới)
-                       Cập nhật: 15/03/2026
+                       Cập nhật: 17/03/2026
 ================================================================================
 
 
@@ -295,46 +295,66 @@ các tính năng mới (project, task, chat, notification).
 0.8. [TẠO MỚI] backend/src/domain/entities/Project.ts
 ────────────────────────────────────────────────────────────────────────────────
 
-  TẠI SAO CẦN TẠO:
-    Dự án đang dùng DDD pattern (đã có User.ts, Password.ts, IUserRepository).
-    Để nhất quán, cần tạo domain entity cho Project trước khi làm Giai đoạn 1.
+  TRẠNG THÁI: Project đang được xử lý trực tiếp qua Prisma trong ProjectService.ts.
+  File entity này là bước DDD tùy chọn — tạo khi muốn tách rule khỏi persistence.
 
-    Prisma schema đã có model `project` (dòng 127-148) với các field:
-    id, company_id, manager_id, project_name, description, start_date, end_date,
-    color_code, label, status. Nhưng chưa có domain entity tương ứng.
+  TẠI SAO (khi làm):
+    Đồng bộ với User.ts / pattern repository: domain thuần, dễ unit test rule ngày,
+    status, duplicate name (logic mirror service nhưng không phụ thuộc DB).
 
-  CHỨC NĂNG CỦA FILE MỚI:
-    Class Project đóng gói logic nghiệp vụ:
-    - Thuộc tính: id, name, description, startDate, endDate, status, colorCode
-    - Ràng buộc: endDate phải > startDate, status chỉ chuyển theo flow
-      (Active → Completed → Archived), không thể archive project đang Active
-    - Method: canComplete() → true nếu tất cả task đã Done
-    - Method: isOverdue() → true nếu endDate < now và chưa Completed
+  ÁNH XẠ PRISMA (model `project` — xem schema.prisma, không hard-code số dòng):
+    project_name → name (camelCase trong entity)
+    color_code → colorCode
+    label → macroLabel hoặc labelsString (một chuỗi CSV nhãn vĩ mô, max ~100 ký tự)
+    priority → ProjectPriority = Low | Medium | High | Urgent (đồng bộ enum Prisma)
 
-    Mục đích OOP:
-    - Encapsulation: không cho set status trực tiếp, phải qua method
-    - Business rule: ngày kết thúc luôn > ngày bắt đầu
+  THUỘC TÍNH & RULE (tránh lỗi nghiệp vụ):
+    - startDate / endDate: optional; nếu cả hai có mặt thì endDate > startDate
+      (trùng khớp ValidationError trong ProjectService).
+    - status: Active | Completed | Archived — chuyển Archived = soft-delete;
+      CHO PHÉP archive từ Active (đúng luồng hiện tại API), không viết rule cấm sai.
+    - priority: tách biệt hoàn toàn khỏi `label` (xem III.A).
+
+  METHOD GỢI Ý (thuần domain, không gọi Prisma):
+    - isOverdue(now): endDate < now && status !== Completed && status !== Archived
+    - canMarkCompleted(taskStats): mọi task (hoặc theo policy) đã Completed — tùy spec
+
+  TỐI ƯU CODE:
+    - Constructor/factory `fromPersistence(row)` và `toPersistence()` một chỗ để mapper
+      Prisma ↔ entity không lặp trong nhiều file.
+    - Immutable update (trả instance mới) hoặc rõ ràng method mutate — chọn một style.
 
 ────────────────────────────────────────────────────────────────────────────────
 0.9. [TẠO MỚI] backend/src/domain/entities/Task.ts
 ────────────────────────────────────────────────────────────────────────────────
 
-  TẠI SAO CẦN TẠO:
-    Tương tự Project.ts. Prisma schema có model `task` (dòng 163-191) nhưng
-    chưa có domain entity. Task là đối tượng phức tạp nhất hệ thống:
+  TRẠNG THÁI: Task chưa có TaskService — entity dùng khi triển khai GĐ2.
 
-  CHỨC NĂNG CỦA FILE MỚI:
-    Class Task đóng gói logic nghiệp vụ:
-    - Ràng buộc trạng thái: Todo → InProgress → Review → Completed
-      (không cho nhảy cóc: Todo → Completed)
-    - Ràng buộc progress: 0-100, không giảm khi đã 100%
-    - Method: archive() → chỉ cho archive khi status = Completed
-    - Method: isOverdue() → true nếu deadline < now và chưa Completed
-    - Method: canAssign(userId) → kiểm tra user có trong project không
+  ÁNH XẠ PRISMA (model `task`):
+    title, label (nhãn kỹ thuật cấp task — Backend, Frontend, Design…; KHÁC label project),
+    description, deadline, priority (task_priority), status (task_status),
+    completion_percent, position, parent_task_id (subtask), is_archived, …
 
-    Mục đích OOP:
-    - Encapsulation: progress, status được bảo vệ, phải đổi qua method
-    - Polymorphism: Task và SubTask cùng interface, xử lý giống nhau
+  RULE TRẠNG THÁI (khớp kế hoạch GĐ2, tránh bug transition):
+    - Luồng chuẩn: Todo → InProgress → Review → Completed
+    - Cấm nhảy cóc Todo → Completed (validate ở service trước khi update DB).
+    - Enum `Overdue` trong schema: có thể đồng bộ bằng job/cron hoặc tính runtime;
+      entity nên có isOverdue(now) = deadline < now && chưa Completed (và không archived).
+
+  TIẾN ĐỘ:
+    - completionPercent ∈ [0, 100]; policy “đạt 100 → auto Review” áp dụng ở service.
+
+  ARCHIVE:
+    - Chỉ is_archived = true khi status = Completed (hoặc theo policy đã thống nhất).
+
+  GÁN VIỆC:
+    - canAssign(userId, projectMemberIds): user thuộc project — validate ở service có
+      query projectmember; entity chỉ nhận Set/List id đã resolve.
+
+  SUBTASK:
+    - Cùng model Task với parent_task_id; không dùng class riêng trừ khi cần behavior khác.
+
+  TỐI ƯU: Một interface ITaskTransition hoặc map hợp lệ nextStatus để tránh if-else lặp.
 
 ────────────────────────────────────────────────────────────────────────────────
 0.10. [TẠO MỚI] backend/src/domain/entities/repositories/IProjectRepository.ts
@@ -564,64 +584,110 @@ Mục tiêu: Admin/Giám đốc có thể tạo, sửa, xóa dự án; thêm/xó
 xem danh sách dự án; nhân viên xem dự án mình tham gia.
 
 ────────────────────────────────────────────────────────────────────────────────
-1.1. [TẠO MỚI] backend/src/services/ProjectService.ts
+III.A [QUY ƯỚC NGHIỆP VỤ] PHÂN TẦNG NHÃN & ĐỘ ƯU TIÊN (Project / Task)
 ────────────────────────────────────────────────────────────────────────────────
 
-  TẠI SAO CẦN TẠO:
-    Prisma schema đã có model `project` và `projectmember` nhưng chưa có bất
-    kỳ code backend nào xử lý. Hiện tại KHÔNG CÓ API nào cho dự án cả.
-    Đây là chức năng CORE của hệ thống quản lý dự án.
+  Mục đích: Tránh nhầm lẫn giữa "nhãn phân loại" ở cấp Dự án và cấp Công việc,
+  và tách riêng "Độ ưu tiên" khỏi nhãn (không gắn "Khẩn cấp" vào ô nhãn).
 
-  CHỨC NĂNG CHI TIẾT:
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │ VỊ TRÍ 1 — CẤP CÔNG VIỆC (Task)                                              │
+  │   • Nhãn (label): phân loại theo loại công việc / team kỹ thuật             │
+  │     VD: [Backend], [Database], [Frontend], [UI/UX], [Design], [QA]…         │
+  │   • Độ ưu tiên (priority): enum task_priority — Low | Medium | High | Urgent│
+  │   • Lưu DB: model `task` có field `label` (String?, max ~100) + `priority`   │
+  │   • UI GĐ2: TaskDetailPanel, List/Kanban — chọn nhãn task + dropdown priority│
+  └─────────────────────────────────────────────────────────────────────────────┘
 
-    createProject(data, userId):
-      Chức năng: Admin/Giám đốc tạo dự án mới
-      Logic: Validate ngày → tạo project → set manager_id = userId →
-             tạo projectmember cho manager (role: Manager) → ghi activity log
-      Quy tắc: end_date phải > start_date, tên dự án không trùng trong cùng công ty
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │ VỊ TRÍ 2 — ĐỘ ƯU TIÊN (Priority) — TÁCH BIỆT, KHÔNG NHÉT VÀO NHÃN            │
+  │   • Cả Project và Task đều có trường priority riêng (dropdown 4 mức).       │
+  │   • Project: enum `project_priority` (Low / Medium / High / Urgent),        │
+  │     mặc định Medium khi tạo mới.                                            │
+  └─────────────────────────────────────────────────────────────────────────────┘
 
-    getAllProjects(userId, role):
-      Chức năng: Lấy danh sách dự án theo quyền
-      Logic:
-        - Admin → xem TẤT CẢ dự án
-        - Director → xem dự án mình là manager + dự án mình là member
-        - Employee → CHỈ xem dự án mình là member
-      Trả về: tên, mô tả, ngày, status, số thành viên, tổng task, % hoàn thành
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │ VỊ TRÍ 3 — CẤP DỰ ÁN (Project) — NHÃN PHÂN LOẠI VĨ MÔ (Macro)                │
+  │   • Nhãn (label): từ khóa phân loại tổng quan dự án, KHÔNG dùng nhãn task    │
+  │     (không dùng "Frontend/Backend" làm nhãn dự án).                         │
+  │   • Gợi ý nhóm trên UI (preset):                                            │
+  │       — Nền tảng: Web App, Mobile App, Desktop App, Landing Page, API…      │
+  │       — Lĩnh vực: E-commerce, Giáo dục, Fintech, Y tế, Truyền thông…        │
+  │       — Tính chất: Dự án nội bộ, Khách hàng VIP, Outsource, Bảo trì, R&D…    │
+  │   • Lưu DB: `project.label` — chuỗi gộp (VD: "Web App, Fintech, Outsource")   │
+  │     hoặc tương đương trong giới hạn VarChar; hiển thị nhiều badge trên UI. │
+  └─────────────────────────────────────────────────────────────────────────────┘
 
-    getProjectById(id, userId):
-      Chức năng: Xem chi tiết 1 dự án
-      Logic: Kiểm tra user có quyền xem (là member hoặc Admin) → trả full info
-      Quy tắc: Employee không phải member → 403 Forbidden
+  ĐÁNH GIÁ DIALOG "TẠO DỰ ÁN MỚI" (UI hiện tại trên ProjectsPage):
+    ✓ Đúng logic với dự án: có Độ ưu tiên riêng; nhãn dự án là macro theo 3 nhóm.
+    ✓ Khớp mục tiêu lọc/báo cáo cấp công ty (VD: lọc "Dự án nội bộ", "E-commerce").
 
-    updateProject(id, data, userId):
-      Chức năng: Sửa thông tin dự án (tên, mô tả, ngày, màu, label)
-      Quy tắc: Chỉ Admin hoặc Manager của project mới được sửa
+  VỀ VIỆC "ĐỂ MẶC ĐỊNH" 3 NHÓM NỀN TẢNG / LĨNH VỰC / TÍNH CHẤT:
+    • Đây là DANH MỤC GỢI Ý (preset) trên form — KHÔNG có nghĩa hệ thống tự gán
+      sẵn giá trị vào DB khi tạo dự án. User có thể không chọn nhãn nào (optional).
+    • Hợp lý: thống nhất từ khóa, giảm nhập tay sai, dễ filter; sau này có thể
+      chuyển sang cấu hình theo công ty (bảng `project_label_preset`) nếu cần.
+    • Nếu nghiệp vụ yêu cầu bắt buộc: thêm rule validate "ít nhất 1 nhãn" hoặc
+      "mỗi nhóm tối đa 1 lựa chọn" — ghi rõ trong validator khi áp dụng.
 
-    deleteProject(id, userId):
-      Chức năng: Xóa (soft delete → Archive) dự án
-      Quy tắc: Chỉ Admin hoặc Manager, phải confirm trước khi xóa
-      Logic: Đổi status → Archived, không xóa thật để giữ lịch sử
+  TRIỂN KHAI CODE (tham chiếu):
+    • Backend: `projectValidator` (project_name, dates, color_code, label, priority),
+      `ProjectService` create/update/get trả `priority` + `label`.
+    • Frontend: Dialog tạo/sửa dự án trong `ProjectsPage.jsx` và tab Cài đặt
+      `ProjectDetailPage.jsx` (chip chọn nhãn macro + Select độ ưu tiên).
+    • Kế hoạch tách component: có thể extract `CreateProjectDialog.jsx` (mục 1.8)
+      khi refactor; hành vi nghiệp vụ giữ nguyên như III.A.
 
-    getProjectMembers(projectId):
-      Chức năng: Lấy danh sách thành viên dự án
-      Trả về: user info + role trong project (Manager/Member/Viewer)
+────────────────────────────────────────────────────────────────────────────────
+1.1. [ĐÃ CÓ / TINH CHỈNH] backend/src/services/ProjectService.ts
+────────────────────────────────────────────────────────────────────────────────
 
-    addProjectMember(projectId, userId, role):
-      Chức năng: Thêm thành viên vào dự án
-      Quy tắc: Chỉ Manager/Admin, user phải thuộc công ty (status Active)
-      Logic: Tạo record projectmember → gửi notification cho user được thêm
+  HIỆN TRẠNG CODE:
+    Service đã triển khai với Prisma + AppError; chưa dùng domain entity 0.8.
 
-    removeProjectMember(projectId, userId):
-      Chức năng: Xóa thành viên khỏi dự án
-      Quy tắc: Không cho xóa Manager (phải chuyển quyền trước)
+  NGUYÊN TẮC TỐI ƯU (tránh lỗi runtime & logic):
+    - Mọi lỗi nghiệp vụ: throw AppError (ValidationError, NotFoundError,
+      ForbiddenError) — không parse message tiếng Việt ở controller.
+    - Cập nhật project: chỉ spread field có trong input (đã undefined-check) để
+      không ghi đè null nhầm.
+    - Trùng tên: chỉ so với project cùng company_id và status ≠ Archived.
 
-    updateMemberRole(projectId, userId, newRole):
-      Chức năng: Đổi role thành viên trong dự án (Manager/Member/Viewer)
-      Quy tắc: Chỉ 1 Manager per project, đổi Manager = chuyển quyền
+  createProject(input, userId):
+    - ensureUserCompany(userId) → company_id
+    - Kiểm tra trùng project_name (non-Archived)
+    - Nếu có start_date & end_date → end > start
+    - create: manager_id = userId, member Manager, optional member_ids (chỉ user
+      Active cùng công ty, bỏ trùng creator)
+    - activitylog CREATE_PROJECT → return getProjectById
 
-    getProjectStats(projectId):
-      Chức năng: Thống kê nhanh cho project card
-      Trả về: totalTasks, completedTasks, overdueTasks, completionPercent
+  getAllProjects(userId, role):
+    - Admin: mọi project company_id = company của user
+    - Director / Employee: project có projectmember chứa user_id
+      (Director là manager vẫn là member — luôn thấy dự án mình quản lý)
+    - Mỗi item: map + getProjectStats (batch/query tối ưu sau nếu N+1 nặng)
+    - Payload: id, project_name, description, dates, color_code, label, priority,
+      status, manager, members (preview), member_count, stats
+
+  getProjectById(projectId, userId):
+    - 404 nếu không có project
+    - 403 nếu không Admin và không có trong projectmember
+
+  updateProject(projectId, input, userId):
+    - assertManagerOrAdmin
+    - Validate dates nếu cả hai gửi; kiểm tra trùng tên khi đổi tên
+    - Cho phép đổi status (Completed…) qua schema update — giữ đồng bộ validator
+
+  deleteProject → Archive:
+    - assertManagerOrAdmin; từ chối nếu đã Archived
+    - status = Archived (soft delete)
+
+  Thành viên: getProjectMembers, addProjectMember, removeProjectMember,
+    updateMemberRole — giữ rule: một Manager; đổi Manager → demote Manager cũ,
+    cập nhật project.manager_id.
+
+  getProjectStats:
+    - Task thuộc taskgroup của project, is_archived = false
+    - completion_percent = round(completed/total*100) hoặc 0 nếu total=0
 
 ────────────────────────────────────────────────────────────────────────────────
 1.2. [TẠO MỚI] backend/src/controllers/projectController.ts
@@ -655,18 +721,37 @@ xem danh sách dự án; nhân viên xem dự án mình tham gia.
     - GET → cho phép tất cả role (Employee xem project mình tham gia)
 
 ────────────────────────────────────────────────────────────────────────────────
-1.4. [TẠO MỚI] backend/src/validators/projectValidator.ts
+1.4. [ĐÃ CÓ / TINH CHỈNH] backend/src/validators/projectValidator.ts
 ────────────────────────────────────────────────────────────────────────────────
 
-  TẠI SAO CẦN TẠO:
-    Validate input khi tạo/sửa project — đảm bảo tên không trống, ngày
-    đúng format, color_code đúng hex (#RRGGBB), label không quá dài.
+  MỤC TIÊU: Zod schema là single source of truth cho body; export type infer để
+    ProjectService dùng type-safe, tránh drift với Prisma.
 
-  CHỨC NĂNG:
-    - createProjectSchema: project_name (required, 1-255 chars), description
-      (optional), start_date (date format), end_date (date, > start_date),
-      color_code (hex format), label (max 100 chars)
-    - addMemberSchema: user_id (required, int), role (enum Manager|Member|Viewer)
+  createProjectSchema:
+    - project_name: string trim, 1–255
+    - description: optional, max 5000, trim
+    - start_date / end_date: string ISO/date parse được hoặc null/omit
+      → so sánh end > start nên làm ở .superRefine() HOẶC giữ như hiện tại ở
+      service (chỉ chọn một nơi để không double-message lệch nhau)
+    - color_code: optional, regex ^#[0-9A-Fa-f]{6}$
+    - label: optional nullable, max 100 (CSV nhãn vĩ mô từ UI chip)
+    - priority: z.enum(['Low','Medium','High','Urgent']).optional().default('Medium')
+    - member_ids: z.array(z.number().int().positive()).optional()
+
+  updateProjectSchema:
+    - Mọi field optional (cách viết hiện tại: từng field .optional() — tương đương
+      .partial() của object đầy đủ); project_name nếu có thì min 1 sau trim
+    - status: enum Active|Completed|Archived (optional)
+    - priority: optional, KHÔNG .default() — tránh PUT thiếu key làm ghi đè Medium
+
+  addMemberSchema: user_id int > 0; role optional default 'Member'
+
+  updateMemberRoleSchema: role bắt buộc, enum Manager|Member|Viewer
+
+  TỐI ƯU / TRÁNH LỖI:
+    - Không .transform(undefined) thành string rỗng cho optional fields gây fail DB
+    - Export CreateProjectInput, UpdateProjectInput, AddMemberInput,
+      UpdateMemberRoleInput
 
 ────────────────────────────────────────────────────────────────────────────────
 1.5. [TẠO MỚI] frontend/src/api/projectApi.js
@@ -689,81 +774,102 @@ xem danh sách dự án; nhân viên xem dự án mình tham gia.
     - getStats(id)          → GET /api/projects/:id/stats
 
 ────────────────────────────────────────────────────────────────────────────────
-1.6. [TẠO MỚI] frontend/src/pages/ProjectsPage.jsx
+1.6. [ĐÃ CÓ / TINH CHỈNH] frontend/src/pages/ProjectsPage.jsx
 ────────────────────────────────────────────────────────────────────────────────
 
-  TẠI SAO CẦN TẠO:
-    Sidebar có link /projects (DashboardLayout dòng 22, 33, 43) nhưng không
-    có page nào → 404. Đây là trang chính để quản lý dự án.
+  HIỆN TRẠNG: Trang đã mount route /projects; dùng projectApi + AuthContext.
 
-  CHỨC NĂNG UI:
-    Header:
-    - Tiêu đề "Dự án" + badge đếm số dự án
-    - Nút "Tạo dự án mới" (chỉ hiện cho Admin/Director)
-    - Bộ lọc: Status (Active/Completed/Archived), ô tìm kiếm tên dự án
+  DATA & SIDE EFFECTS:
+    - fetchProjects: useCallback + useEffect — dependency đúng để không loop vô hạn
+    - API: res.data.data || [] — xử lý null an toàn
+    - Toast: cleanup timeout tránh setState sau unmount nếu sau này đổi sang lib
 
-    Body — Card Grid:
-    - Mỗi dự án = 1 card với:
-      + Color stripe bên trái (từ color_code)
-      + Tên dự án (in đậm) + label badge
-      + Mô tả ngắn (cắt 2 dòng)
-      + Ngày: "15/03 → 30/06/2026"
-      + Avatar stack: ảnh đại diện 3-4 thành viên đầu + "+5 thêm"
-      + Progress bar: "65% hoàn thành" (từ getStats)
-      + Status badge: Đang hoạt động / Hoàn thành / Lưu trữ
-    - Click card → navigate đến /projects/:id (ProjectDetailPage)
-    - Dropdown menu (⋮): Chỉnh sửa, Lưu trữ, Xóa
+  HEADER & FILTER:
+    - canManage = role Admin | Director
+    - Tabs status: all / Active / Completed / Archived
+    - Search: filter theo project_name HOẶC label (chuỗi CSV) — lowercase includes
 
-    Empty state: Khi chưa có dự án → illustration + "Tạo dự án đầu tiên"
+  CARD:
+    - stopPropagation trên dropdown ⋮ để không navigate khi mở menu
+    - Priority badge: map API → nhãn tiếng Việt (Low→Thấp, …)
+    - Label: split(',') trim → nhiều Badge (không hiển thị một chuỗi dài)
+    - stats.completion_percent: fallback 0
 
-────────────────────────────────────────────────────────────────────────────────
-1.7. [TẠO MỚI] frontend/src/pages/ProjectDetailPage.jsx
-────────────────────────────────────────────────────────────────────────────────
+  DIALOG TẠO DỰ ÁN (inline hoặc tách 1.8):
+    - Payload: omit key rỗng (start_date, end_date, label) trước POST
+    - priority luôn gửi (default Medium trong form state)
+    - Chip label → chuỗi CSV ≤ 100 ký tự (truncate hoặc cảnh báo nếu vượt)
 
-  TẠI SAO CẦN TẠO:
-    Khi click vào 1 dự án trên ProjectsPage, cần trang chi tiết hiển thị
-    tất cả thông tin: tổng quan, công việc, thành viên, tài liệu.
-
-  CHỨC NĂNG UI — Tabs navigation:
-
-    Tab "Tổng quan":
-    - Thông tin dự án: tên, mô tả, ngày bắt đầu/kết thúc, trạng thái
-    - Thống kê: 4 card (tổng task, hoàn thành, đang làm, quá hạn)
-    - Progress bar tổng thể dự án
-    - Danh sách task gần deadline (5 task sắp hết hạn nhất)
-
-    Tab "Công việc" (tạo ở GĐ2):
-    - Switch view: List | Kanban
-    - Hiển thị task groups + tasks
-
-    Tab "Thành viên":
-    - Danh sách thành viên: avatar, tên, email, role trong project
-    - Nút "Thêm thành viên" → Dialog chọn từ danh sách công ty
-    - Menu actions: Đổi role, Xóa khỏi dự án
-
-    Tab "Tài liệu" (tạo ở GĐ4):
-    - File manager
-
-    Tab "Cài đặt" (chỉ Manager/Admin):
-    - Sửa tên, mô tả, ngày, màu sắc, label
-    - Nút "Lưu trữ dự án" (Archive)
+  REFACTOR TỐI ƯU:
+    - Đưa PROJECT_LABEL_GROUPS, PRIORITY_OPTIONS ra `constants/projectUi.js` dùng
+      chung ProjectDetailPage (tránh lệch preset giữa 2 file)
 
 ────────────────────────────────────────────────────────────────────────────────
-1.8. [TẠO MỚI] frontend/src/components/project/CreateProjectDialog.jsx
+1.7. [ĐÃ CÓ / TINH CHỈNH] frontend/src/pages/ProjectDetailPage.jsx
 ────────────────────────────────────────────────────────────────────────────────
 
-  TẠI SAO CẦN TẠO:
-    Dialog (modal) tạo dự án mới, mở khi click "Tạo dự án" trên ProjectsPage.
+  ROUTE: /projects/:id — useParams id string; parse Number(id) hoặc API nhận string
+    tùy backend (hiện axios path id trực tiếp).
 
-  CHỨC NĂNG UI:
-    - Form: Tên dự án (required), Mô tả (textarea)
-    - Date pickers: Ngày bắt đầu, Ngày kết thúc
-    - Color picker: chọn màu nhận diện dự án (6-8 màu preset)
-    - Label input: nhãn phân loại (VD: "Frontend", "Backend", "Design")
-    - Multi-select: Chọn thành viên từ danh sách công ty (checkbox list)
-    - Nút: "Hủy" + "Tạo dự án"
-    - Loading state khi submit
-    - Validation: tên không trống, end_date > start_date
+  PHÂN QUYỀN UI:
+    - canManage = user.role === 'Admin' OR user là project member có project_role
+      === 'Manager' (Director không tự có quyền nếu chỉ là Member)
+
+  TAB "Tổng quan":
+    - Stats từ project.stats; progress bar màu theo color_code
+    - Hiển thị priority + label (split badge) đồng bộ list
+
+  TAB "Công việc": placeholder GĐ2 — không block render nếu API task chưa có
+
+  TAB "Thành viên":
+    - addMember: userApi.getAll filter Active & chưa trong project
+    - Role dropdown: thường Member/Viewer; Manager chỉ khi business cho phép
+    - Error từ API hiển thị trong Dialog
+
+  TAB "Tài liệu": placeholder GĐ4
+
+  TAB "Cài đặt" (canManage):
+    - Form sync khi project load (useEffect khi project.id đổi) — tránh stale state
+      sau khi Save
+    - PUT payload: gửi label null nếu user bỏ hết chip (backend nhận null)
+    - Archive: navigate('/projects') sau thành công
+
+  LỖI THƯỜNG GẶP — TRÁNH:
+    - Quên dependency [id] khi fetchProject
+    - SettingsTab state khởi tạo một lần không cập nhật khi đổi project (bug khi
+      điều hướng giữa 2 dự án không unmount)
+
+────────────────────────────────────────────────────────────────────────────────
+1.8. [TÁCH FILE — KHUYẾN NGHỊ] frontend/src/components/project/CreateProjectDialog.jsx
+────────────────────────────────────────────────────────────────────────────────
+
+  MỤC ĐÍCH: Giảm kích thước ProjectsPage; một component một trách nhiệm; dễ test
+    snapshot / React Testing Library.
+
+  PROPS GỢI Ý (typed nếu chuyển TS sau):
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    onSuccess: (message?: string) => void
+    initialColor?: string  // optional override preset default
+
+  IMPORT CHUNG:
+    - LabelChipSelector + PROJECT_LABEL_GROUPS + PRIORITY_OPTIONS từ
+      `constants/projectUi.js` hoặc `components/project/projectFormPresets.jsx`
+      (bắt buộc import một nguồn với ProjectDetailPage Settings)
+
+  NỘI DUNG FORM (khớp III.A):
+    - Tên dự án *, mô tả, ngày bắt đầu/kết thúc, màu preset, Select priority,
+      chip nhãn vĩ mô 3 nhóm
+    - member_ids: nếu thêm UI multi-select user, map id[]; không gửi field nếu rỗng
+
+  HÀNH VI:
+    - Reset form khi đóng dialog (onOpenChange false)
+    - submit: preventDefault, loading state, try/catch axios message
+    - Dialog max-height + scroll nếu nhiều chip (mobile)
+
+  KHÔNG LÀM:
+    - Không nhúng nhãn task (Backend/Design) vào dialog project
+    - Không hard-code URL API — dùng projectApi.create
 
 ────────────────────────────────────────────────────────────────────────────────
 1.9. [SỬA] frontend/src/App.jsx
@@ -831,7 +937,7 @@ xem dạng List và Kanban.
 
   TẠI SAO CẦN TẠO:
     Đây là SERVICE LỚN NHẤT, cốt lõi hệ thống. Prisma schema đã có model
-    `task` (dòng 163-191) nhưng chưa có code xử lý nào.
+    `task` (có `label` cho nhãn cấp task + `priority`) nhưng chưa có code xử lý.
 
   CHỨC NĂNG CHI TIẾT:
 
@@ -840,8 +946,9 @@ xem dạng List và Kanban.
         leader, giao thành viên, thiết lập deadline"
       Logic: Validate data → tạo task trong taskGroup → tạo taskassignee nếu
         có assignee_ids → gửi notification cho người được giao
-      Dữ liệu: title (bắt buộc), description, deadline, priority (Low/Medium/
-        High/Urgent), assignee_ids[]
+      Dữ liệu: title (bắt buộc), label (optional — nhãn kỹ thuật/team: Backend,
+        Frontend, UI/UX, Design… — xem III.A, KHÁC nhãn vĩ mô của project),
+        description, deadline, priority (Low/Medium/High/Urgent), assignee_ids[]
 
     getTaskById(id):
       Tại sao: Khi click vào task, cần xem toàn bộ thông tin chi tiết
@@ -849,7 +956,7 @@ xem dạng List và Kanban.
         mới nhất) + dependencies + documents đính kèm
 
     updateTask(id, data, userId):
-      Tại sao: Sửa tiêu đề, mô tả, deadline, priority
+      Tại sao: Sửa tiêu đề, nhãn task, mô tả, deadline, priority
       Quy tắc: Chỉ creator hoặc assignee hoặc project Manager mới được sửa
       Logic: Update task → ghi activity log → notify assignees về thay đổi
 
@@ -894,7 +1001,7 @@ xem dạng List và Kanban.
     getMyTasks(userId, filters):
       Tại sao: Phần 5.2 — "My Tasks: Xem danh sách công việc của chính mình"
       Trả về: Tất cả task user được giao, nhóm theo project, filter theo
-        status/priority/deadline
+        status/priority/deadline/label (nhãn task)
 
     reorderTasks(taskGroupId, orderedIds[]):
       Tại sao: Kéo thả task trong list view để sắp xếp ưu tiên
@@ -954,6 +1061,7 @@ xem dạng List và Kanban.
     - Mỗi section = 1 TaskGroup (VD: "Thiết kế UI", "Backend API")
     - Trong mỗi section = danh sách tasks:
       + Tiêu đề task (click mở TaskDetailPanel)
+      + Badge nhãn task (Backend, Frontend, Design…) nếu có — xem III.A
       + Avatar assignees (stack tối đa 3)
       + Priority badge (Thấp=xanh, Trung bình=vàng, Cao=cam, Khẩn cấp=đỏ)
       + Deadline (đỏ nếu quá hạn)
@@ -994,6 +1102,8 @@ xem dạng List và Kanban.
     Slide-over panel từ bên phải (overlay, không phải page mới):
     - Header: Tiêu đề task (editable inline), nút đóng (X)
     - Status selector (dropdown 4 trạng thái)
+    - Nhãn task (label): chip hoặc multi-select preset kỹ thuật (Backend, DB,
+      Frontend, UI/UX, Design…) — không dùng nhãn vĩ mô của project
     - Priority selector (4 mức)
     - Description: textarea rich text (có thể dùng markdown)
     - Assignees section: danh sách avatar + tên, nút "+" thêm người

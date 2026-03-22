@@ -13,7 +13,8 @@ function toDomain(project: any): Project {
     endDate: project.end_date,
     colorCode: project.color_code,
     label: project.label,
-    status: project.status as ProjectStatus | null ?? ProjectStatus.ACTIVE,
+    priority: project.priority ?? 'Medium',
+    status: (project.status as ProjectStatus | null) ?? ProjectStatus.ACTIVE,
     createdAt: project.created_at,
   });
 }
@@ -52,7 +53,8 @@ export class PrismaProjectRepository implements IProjectRepository {
         end_date: project.endDate ?? undefined,
         color_code: project.colorCode ?? undefined,
         label: project.label ?? undefined,
-        status: project.status,
+        priority: project.priority ?? undefined,
+        status: project.status ?? undefined,
       },
     });
     return toDomain(record);
@@ -70,7 +72,8 @@ export class PrismaProjectRepository implements IProjectRepository {
         end_date: project.endDate ?? undefined,
         color_code: project.colorCode ?? undefined,
         label: project.label ?? undefined,
-        status: project.status,
+        priority: project.priority ?? undefined,
+        status: project.status ?? undefined,
       },
     });
     return toDomain(record);

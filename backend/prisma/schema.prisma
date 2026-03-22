@@ -132,10 +132,11 @@ model project {
   description   String?         @db.Text
   start_date    DateTime?       @db.Date
   end_date      DateTime?       @db.Date
-  color_code    String?         @default("#000000") @db.VarChar(7)
-  label         String?         @db.VarChar(100)
-  status        project_status? @default(Active)
-  created_at    DateTime?       @default(now()) @db.Timestamp(0)
+  color_code    String?           @default("#000000") @db.VarChar(7)
+  label         String?           @db.VarChar(100)
+  priority      project_priority? @default(Medium)
+  status        project_status?   @default(Active)
+  created_at    DateTime?         @default(now()) @db.Timestamp(0)
   chatgroup     chatgroup[]
   document      document[]
   company       company?        @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_project_company")
@@ -166,6 +167,7 @@ model task {
   task_group_id                                      Int?
   creator_id                                         Int?
   title                                              String           @db.VarChar(255)
+  label                                              String?          @db.VarChar(100)
   description                                        String?          @db.Text
   deadline                                           DateTime?        @db.DateTime(0)
   priority                                           task_priority?   @default(Medium)
@@ -304,6 +306,13 @@ enum task_status {
   Review
   Completed
   Overdue
+}
+
+enum project_priority {
+  Low
+  Medium
+  High
+  Urgent
 }
 
 enum project_status {

@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -30,10 +29,12 @@ import {
   Loader2,
   AlertCircle,
   Calendar,
-  Users,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import projectApi from "@/api/projectApi";
+import CreateProjectDialog from "@/components/project/CreateProjectDialog";
+import { PriorityBadge, LabelBadges } from "@/components/project/ProjectBadges";
+import { DEFAULT_PROJECT_COLOR } from "@/constants/projectUi";
 
 const STATUS_TABS = [
   { key: "all", label: "Tất cả" },
@@ -47,11 +48,6 @@ const STATUS_BADGE = {
   Completed: { label: "Hoàn thành", className: "bg-blue-100 text-blue-700 border-blue-200" },
   Archived: { label: "Lưu trữ", className: "bg-slate-100 text-slate-500 border-slate-200" },
 };
-
-const COLOR_PRESETS = [
-  "#2563EB", "#059669", "#D97706", "#DC2626",
-  "#7C3AED", "#0891B2", "#DB2777", "#4F46E5",
-];
 
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
@@ -67,7 +63,6 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-// ─── Toast ──────────────────────────────────────────────────
 function Toast({ message, type = "success", onClose }) {
   useEffect(() => {
     const t = setTimeout(onClose, 3000);
@@ -77,131 +72,41 @@ function Toast({ message, type = "success", onClose }) {
     <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
       <div className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
         {message}
-        <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100">&times;</button>
+        <button type="button" onClick={onClose} className="ml-2 opacity-70 hover:opacity-100">&times;</button>
       </div>
     </div>
   );
 }
 
-// ─── Create Project Dialog ──────────────────────────────────
-function CreateProjectDialog({ open, onOpenChange, onSuccess }) {
-  const [form, setForm] = useState({
-    project_name: "",
-    description: "",
-    start_date: "",
-    end_date: "",
-    color_code: COLOR_PRESETS[0],
-    label: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const reset = () => {
-    setForm({ project_name: "", description: "", start_date: "", end_date: "", color_code: COLOR_PRESETS[0], label: "" });
-    setError("");
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (!form.project_name.trim()) { setError("Vui lòng nhập tên dự án"); return; }
-    if (form.start_date && form.end_date && new Date(form.end_date) <= new Date(form.start_date)) {
-      setError("Ngày kết thúc phải sau ngày bắt đầu");
-      return;
-    }
-    setLoading(true);
-    try {
-      const payload = { ...form };
-      if (!payload.start_date) delete payload.start_date;
-      if (!payload.end_date) delete payload.end_date;
-      if (!payload.label) delete payload.label;
-      await projectApi.create(payload);
-      reset();
-      onOpenChange(false);
-      onSuccess("Tạo dự án thành công");
-    } catch (err) {
-      setError(err.response?.data?.message || "Có lỗi xảy ra");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Tạo dự án mới</DialogTitle>
-          <DialogDescription>Điền thông tin dự án để bắt đầu quản lý công việc.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-              <AlertCircle className="h-4 w-4 shrink-0" />{error}
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="pname">Tên dự án *</Label>
-            <Input id="pname" placeholder="VD: Website Redesign" value={form.project_name} onChange={(e) => setForm({ ...form, project_name: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="pdesc">Mô tả</Label>
-            <textarea id="pdesc" rows={3} className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Mô tả ngắn về dự án..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sdate">Ngày bắt đầu</Label>
-              <Input id="sdate" type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edate">Ngày kết thúc</Label>
-              <Input id="edate" type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Màu nhận diện</Label>
-            <div className="flex gap-2">
-              {COLOR_PRESETS.map((c) => (
-                <button key={c} type="button" onClick={() => setForm({ ...form, color_code: c })} className={`h-8 w-8 rounded-full border-2 transition-all ${form.color_code === c ? "border-slate-900 scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} />
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plabel">Nhãn phân loại</Label>
-            <Input id="plabel" placeholder="VD: Frontend, Backend, Design" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Hủy</Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Tạo dự án
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Project Card ───────────────────────────────────────────
 function ProjectCard({ project, canManage, onArchive, onClick }) {
   const sBadge = STATUS_BADGE[project.status] || STATUS_BADGE.Active;
   const members = project.members || [];
   const visibleMembers = members.slice(0, 4);
   const extraCount = (project.member_count || members.length) - visibleMembers.length;
   const pct = project.stats?.completion_percent ?? 0;
+  const stripeColor = project.color_code || DEFAULT_PROJECT_COLOR;
 
   return (
-    <div onClick={() => onClick(project.id)} className="group relative flex cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-slate-300">
-      <div className="w-1.5 shrink-0" style={{ backgroundColor: project.color_code || "#2563EB" }} />
+    <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(project.id); } }}
+      onClick={() => onClick(project.id)}
+      className="group relative flex cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-slate-300"
+    >
+      <div className="w-1.5 shrink-0" style={{ backgroundColor: stripeColor }} />
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="truncate text-base font-semibold text-slate-900">{project.project_name}</h3>
-              {project.label && (
-                <Badge variant="outline" className="text-xs shrink-0">{project.label}</Badge>
-              )}
+              <PriorityBadge priority={project.priority} className="text-[10px]" />
             </div>
+            {project.label && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                <LabelBadges label={project.label} badgeClassName="text-[10px] shrink-0" />
+              </div>
+            )}
             {project.description && (
               <p className="mt-1 line-clamp-2 text-sm text-slate-500">{project.description}</p>
             )}
@@ -229,24 +134,34 @@ function ProjectCard({ project, canManage, onArchive, onClick }) {
         {(project.start_date || project.end_date) && (
           <div className="mb-3 flex items-center gap-1.5 text-xs text-slate-400">
             <Calendar className="h-3.5 w-3.5" />
-            <span>{formatDate(project.start_date)}{project.start_date && project.end_date && " → "}{formatDate(project.end_date)}</span>
+            <span>
+              {formatDate(project.start_date)}
+              {project.start_date && project.end_date && " → "}
+              {formatDate(project.end_date)}
+            </span>
           </div>
         )}
 
         <div className="mb-3">
           <div className="mb-1 flex items-center justify-between text-xs">
             <span className="text-slate-500">{pct}% hoàn thành</span>
-            {project.stats && <span className="text-slate-400">{project.stats.completed_tasks}/{project.stats.total_tasks} task</span>}
+            {project.stats && (
+              <span className="text-slate-400">{project.stats.completed_tasks}/{project.stats.total_tasks} task</span>
+            )}
           </div>
           <div className="h-1.5 w-full rounded-full bg-slate-100">
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: project.color_code || "#2563EB" }} />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: stripeColor }} />
           </div>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             {visibleMembers.map((m, i) => (
-              <div key={m.id} className={`${AVATAR_COLORS[m.id % AVATAR_COLORS.length]} flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-white ${i > 0 ? "-ml-2" : ""}`} title={m.full_name}>
+              <div
+                key={m.id}
+                className={`${AVATAR_COLORS[m.id % AVATAR_COLORS.length]} flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-white ${i > 0 ? "-ml-2" : ""}`}
+                title={m.full_name}
+              >
                 {getInitials(m.full_name)}
               </div>
             ))}
@@ -263,7 +178,6 @@ function ProjectCard({ project, canManage, onArchive, onClick }) {
   );
 }
 
-// ─── Projects Page ──────────────────────────────────────────
 export default function ProjectsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -292,11 +206,16 @@ export default function ProjectsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   const showToast = (message, type = "success") => setToast({ message, type });
 
-  const handleCreateSuccess = (msg) => { showToast(msg); fetchProjects(); };
+  const handleCreateSuccess = (msg) => {
+    showToast(msg);
+    fetchProjects();
+  };
 
   const handleArchiveConfirm = async () => {
     if (!archiveConfirm) return;
@@ -325,7 +244,6 @@ export default function ProjectsPage() {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8">
-        {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-3">
@@ -343,11 +261,15 @@ export default function ProjectsPage() {
           )}
         </div>
 
-        {/* Filters */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
             {STATUS_TABS.map((tab) => (
-              <button key={tab.key} onClick={() => setStatusFilter(tab.key)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === tab.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setStatusFilter(tab.key)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === tab.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              >
                 {tab.label}
               </button>
             ))}
@@ -358,7 +280,6 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -390,17 +311,15 @@ export default function ProjectsPage() {
                 project={p}
                 canManage={canManage}
                 onArchive={setArchiveConfirm}
-                onClick={(id) => navigate(`/projects/${id}`)}
+                onClick={(pid) => navigate(`/projects/${pid}`)}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Create Dialog */}
       <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={handleCreateSuccess} />
 
-      {/* Archive Confirm Dialog */}
       <Dialog open={!!archiveConfirm} onOpenChange={(v) => { if (!v) setArchiveConfirm(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -420,7 +339,6 @@ export default function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </DashboardLayout>
   );

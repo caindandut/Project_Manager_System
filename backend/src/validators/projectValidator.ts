@@ -4,6 +4,8 @@ const projectMemberRoleEnum = z.enum(['Manager', 'Member', 'Viewer']);
 
 const projectStatusEnum = z.enum(['Active', 'Completed', 'Archived']);
 
+const projectPriorityEnum = z.enum(['Low', 'Medium', 'High', 'Urgent']);
+
 const hexColor = z
   .string()
   .regex(/^#[0-9A-Fa-f]{6}$/, 'Mã màu phải đúng định dạng hex (#RRGGBB)')
@@ -15,8 +17,25 @@ const dateString = z
   .optional()
   .nullable();
 
+/** Khi body có cả hai ngày — kiểm tra trước khi vào service (PUT chỉ validate nếu gửi đủ 2 key). */
+function refineProjectDates(
+  data: { start_date?: string | null; end_date?: string | null },
+  ctx: z.RefinementCtx,
+) {
+  if (data.start_date && data.end_date) {
+    if (new Date(data.end_date) <= new Date(data.start_date)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ngày kết thúc phải sau ngày bắt đầu',
+        path: ['end_date'],
+      });
+    }
+  }
+}
+
 /** Tạo dự án — POST /api/projects */
-export const createProjectSchema = z.object({
+export const createProjectSchema = z
+  .object({
   project_name: z
     .string()
     .min(1, 'Vui lòng nhập tên dự án')
@@ -33,15 +52,18 @@ export const createProjectSchema = z.object({
   color_code: hexColor,
   label: z
     .string()
-    .max(100, 'Nhãn tối đa 100 ký tự')
+    .max(100, 'Nhãn phân loại dự án tối đa 100 ký tự')
     .transform((v) => v.trim())
     .optional()
     .nullable(),
+  priority: projectPriorityEnum.optional().default('Medium'),
   member_ids: z.array(z.number().int().positive()).optional(),
-});
+  })
+  .superRefine(refineProjectDates);
 
 /** Cập nhật dự án — PUT /api/projects/:id */
-export const updateProjectSchema = z.object({
+export const updateProjectSchema = z
+  .object({
   project_name: z
     .string()
     .min(1, 'Tên dự án không được để trống')
@@ -59,12 +81,14 @@ export const updateProjectSchema = z.object({
   color_code: hexColor,
   label: z
     .string()
-    .max(100, 'Nhãn tối đa 100 ký tự')
+    .max(100, 'Nhãn phân loại dự án tối đa 100 ký tự')
     .transform((v) => v.trim())
     .optional()
     .nullable(),
+  priority: projectPriorityEnum.optional(),
   status: projectStatusEnum.optional(),
-});
+  })
+  .superRefine(refineProjectDates);
 
 /** Thêm thành viên — POST /api/projects/:id/members */
 export const addMemberSchema = z.object({

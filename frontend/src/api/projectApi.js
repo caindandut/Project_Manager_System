@@ -8,6 +8,7 @@ const projectApi = {
   archive: (id) => axiosClient.delete(`/projects/${id}`),
 
   getMembers: (id) => axiosClient.get(`/projects/${id}/members`),
+  getMemberCandidates: (id) => axiosClient.get(`/projects/${id}/member-candidates`),
   addMember: (id, data) => axiosClient.post(`/projects/${id}/members`, data),
   removeMember: (projectId, userId) =>
     axiosClient.delete(`/projects/${projectId}/members/${userId}`),
