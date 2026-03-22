@@ -609,7 +609,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
   PACKAGES CẦN: @dnd-kit/core, @dnd-kit/sortable
 
 ────────────────────────────────────────────────────────────────────────────────
-2.9. [TẠO MỚI] frontend/src/components/task/TaskDetailPanel.jsx
+2.9. [ĐÃ CÓ] frontend/src/components/task/TaskDetailPanel.jsx
 ────────────────────────────────────────────────────────────────────────────────
 
   MỤC ĐÍCH: Slide-over panel khi click task (không navigate sang page mới)

@@ -23,7 +23,7 @@ import { Loader2, Plus, Calendar, CheckCircle2, GripVertical } from "lucide-reac
 import taskGroupApi from "@/api/taskGroupApi";
 import taskApi from "@/api/taskApi";
 import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants/taskUi";
-import TaskDetailSlideOver from "@/components/task/TaskDetailSlideOver";
+import TaskDetailPanel from "@/components/task/TaskDetailPanel";
 
 const KANBAN_STATUSES = ["Todo", "InProgress", "Review", "Completed"];
 
@@ -287,7 +287,13 @@ function KanbanColumn({
 /**
  * GĐ2 mục 2.8 — Kanban 4 cột theo trạng thái, kéo thả → updateStatus.
  */
-export default function KanbanView({ projectId, showToast, canEditTasks = false }) {
+export default function KanbanView({
+  projectId,
+  showToast,
+  canEditTasks = false,
+  canManageProject = false,
+  onTaskUpdated,
+}) {
   const [groups, setGroups] = useState([]);
   const [columns, setColumns] = useState({
     Todo: [],
@@ -299,8 +305,7 @@ export default function KanbanView({ projectId, showToast, canEditTasks = false 
   const [activeTask, setActiveTask] = useState(null);
   const [savingDrag, setSavingDrag] = useState(false);
   const [addValue, setAddValue] = useState({});
-  const [detailTask, setDetailTask] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
 
   const defaultGroupId = groups[0]?.id;
 
@@ -347,18 +352,8 @@ export default function KanbanView({ projectId, showToast, canEditTasks = false 
     };
   }, [projectId, showToast, applyGroupsToColumns]);
 
-  const openDetail = async (task) => {
-    setDetailTask({ id: task.id, title: task.title });
-    setDetailLoading(true);
-    try {
-      const res = await taskApi.getById(task.id);
-      setDetailTask(res.data.data);
-    } catch (err) {
-      showToast(err.response?.data?.message || "Không tải chi tiết task", "error");
-      setDetailTask(null);
-    } finally {
-      setDetailLoading(false);
-    }
+  const openDetail = (task) => {
+    setSelectedTaskId(task.id);
   };
 
   const handleAdd = async (targetColumnStatus) => {
@@ -497,10 +492,16 @@ export default function KanbanView({ projectId, showToast, canEditTasks = false 
         </DragOverlay>
       </DndContext>
 
-      <TaskDetailSlideOver
-        task={detailTask}
-        loading={detailLoading}
-        onClose={() => setDetailTask(null)}
+      <TaskDetailPanel
+        taskId={selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        showToast={showToast}
+        canEditTasks={canEditTasks}
+        canManageProject={canManageProject}
+        onTaskUpdated={() => {
+          refetch();
+          onTaskUpdated?.();
+        }}
       />
     </div>
   );

@@ -167,7 +167,7 @@ function OverviewTab({ project }) {
 }
 
 // ─── Tab: Công việc (GĐ2 mục 2.7 / 2.8) ────────────────────
-function TasksTab({ project, user, showToast }) {
+function TasksTab({ project, user, showToast, canManage, onProjectRefresh }) {
   const [taskView, setTaskView] = useState("list");
   const myRole = project?.members?.find((m) => m.id === user?.id)?.project_role;
   const canEditTasks =
@@ -203,12 +203,16 @@ function TasksTab({ project, user, showToast }) {
           projectId={project.id}
           showToast={showToast}
           canEditTasks={canEditTasks}
+          canManageProject={canManage}
+          onTaskUpdated={onProjectRefresh}
         />
       ) : (
         <KanbanView
           projectId={project.id}
           showToast={showToast}
           canEditTasks={canEditTasks}
+          canManageProject={canManage}
+          onTaskUpdated={onProjectRefresh}
         />
       )}
     </div>
@@ -697,7 +701,13 @@ export default function ProjectDetailPage() {
             {/* Tab Content */}
             {activeTab === "overview" && <OverviewTab project={project} />}
             {activeTab === "tasks" && (
-              <TasksTab project={project} user={user} showToast={showToast} />
+              <TasksTab
+                project={project}
+                user={user}
+                showToast={showToast}
+                canManage={canManage}
+                onProjectRefresh={fetchProject}
+              />
             )}
             {activeTab === "members" && <MembersTab project={project} canManage={canManage} onRefresh={fetchProject} showToast={showToast} />}
             {activeTab === "documents" && <DocumentsTab />}

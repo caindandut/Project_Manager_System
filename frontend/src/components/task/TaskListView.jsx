@@ -41,7 +41,7 @@ import {
   Plus,
   Calendar,
 } from "lucide-react";
-import TaskDetailSlideOver from "@/components/task/TaskDetailSlideOver";
+import TaskDetailPanel from "@/components/task/TaskDetailPanel";
 import taskGroupApi from "@/api/taskGroupApi";
 import taskApi from "@/api/taskApi";
 import {
@@ -329,12 +329,14 @@ function GroupTaskList({
 
 /**
  * GĐ2 mục 2.7 — Danh sách nhóm công việc (accordion + DnD task + quick add).
- * Panel chi tiết tối giản; mục 2.9 sẽ thay bằng TaskDetailPanel đầy đủ.
+ * Chi tiết task: TaskDetailPanel (mục 2.9).
  */
 export default function TaskListView({
   projectId,
   showToast,
   canEditTasks = false,
+  canManageProject = false,
+  onTaskUpdated,
 }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -346,8 +348,7 @@ export default function TaskListView({
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupLoading, setNewGroupLoading] = useState(false);
 
-  const [detailTask, setDetailTask] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
 
   const [quickTitle, setQuickTitle] = useState({});
 
@@ -458,18 +459,8 @@ export default function TaskListView({
     }
   };
 
-  const openDetail = async (task) => {
-    setDetailTask({ id: task.id, title: task.title, status: task.status });
-    setDetailLoading(true);
-    try {
-      const res = await taskApi.getById(task.id);
-      setDetailTask(res.data.data);
-    } catch (err) {
-      showToast(err.response?.data?.message || "Không tải chi tiết task", "error");
-      setDetailTask(null);
-    } finally {
-      setDetailLoading(false);
-    }
+  const openDetail = (task) => {
+    setSelectedTaskId(task.id);
   };
 
   const handleDragStart = ({ active }) => {
@@ -639,10 +630,16 @@ export default function TaskListView({
         </DialogContent>
       </Dialog>
 
-      <TaskDetailSlideOver
-        task={detailTask}
-        loading={detailLoading}
-        onClose={() => setDetailTask(null)}
+      <TaskDetailPanel
+        taskId={selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        showToast={showToast}
+        canEditTasks={canEditTasks}
+        canManageProject={canManageProject}
+        onTaskUpdated={() => {
+          refetch();
+          onTaskUpdated?.();
+        }}
       />
     </div>
   );
