@@ -14,10 +14,10 @@ function formatZodMessage(err: ZodError): string {
   return path + (first.message || 'Giá trị không hợp lệ');
 }
 
+
 /**
  * Middleware validate dữ liệu request theo Zod schema.
- * - Nếu sai → trả 400 + message lỗi chi tiết (ValidationError)
- * - Nếu đúng → gán dữ liệu đã parse/transform vào req[source], gọi next()
+ * Express 5: req.query là getter chỉ-đọc → khi source='query', lưu vào req.validatedQuery.
  */
 export function validate(schema: ZodSchema, source: ValidateSource = 'body') {
   return (req: Request, _res: Response, next: NextFunction): void => {
@@ -25,7 +25,12 @@ export function validate(schema: ZodSchema, source: ValidateSource = 'body') {
     const result = schema.safeParse(raw);
 
     if (result.success) {
-      (req as any)[source] = result.data;
+      if (source === 'query') {
+        // Express 5: req.query chỉ-đọc → lưu sang property riêng
+        (req as any).validatedQuery = result.data;
+      } else {
+        (req as any)[source] = result.data;
+      }
       next();
       return;
     }

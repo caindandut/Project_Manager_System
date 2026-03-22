@@ -8,7 +8,8 @@ import { parseRequestId } from '../utils/parseRequestId';
 export const getMyTasks = asyncHandler(async (req: Request | any, res: Response) => {
   const userId = req.user?.id;
   if (!userId) throw new UnauthorizedError();
-  const data = await taskService.getMyTasks(userId, req.query);
+  const filters = req.validatedQuery ?? req.query;
+  const data = await taskService.getMyTasks(userId, filters);
   res.status(200).json({ success: true, message: 'Lấy công việc được giao thành công', data });
 });
 
