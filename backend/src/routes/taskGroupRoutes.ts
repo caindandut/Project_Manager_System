@@ -1,3 +1,6 @@
+/**
+ * GĐ2 mục 2.4 — Nhóm công việc: nested `/api/projects` + flat `/api/task-groups`.
+ */
 import express, { Router } from 'express';
 import { protect } from '../middlewares/authMiddleware';
 import { validate } from '../middlewares/validateMiddleware';

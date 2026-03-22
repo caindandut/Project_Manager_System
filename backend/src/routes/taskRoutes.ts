@@ -1,3 +1,6 @@
+/**
+ * GĐ2 mục 2.4 — Task API dưới prefix `/api` (sau mount trong app.ts).
+ */
 import express, { Router } from 'express';
 import { protect } from '../middlewares/authMiddleware';
 import { validate } from '../middlewares/validateMiddleware';
