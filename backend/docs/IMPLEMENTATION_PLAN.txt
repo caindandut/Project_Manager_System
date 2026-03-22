@@ -296,10 +296,12 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
       - Batch update position theo index
 
 ────────────────────────────────────────────────────────────────────────────────
-2.2. [TẠO MỚI] backend/src/services/TaskService.ts
+2.2. [ĐÃ CÓ] backend/src/services/TaskService.ts
 ────────────────────────────────────────────────────────────────────────────────
 
   MỤC ĐÍCH: Service lớn nhất — quản lý task, subtask, assignee, dependency
+  GHI CHÚ: Kèm helpers/projectAccess (dùng chung TaskGroupService). Validator taskValidator.ts.
+            Chưa mount HTTP — mục 2.3. Thông báo GĐ3 / join room project:* socket sau này.
 
   METHODS CHI TIẾT:
 
@@ -392,7 +394,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
       - Reorder tasks trong group cũ và mới
 
 ────────────────────────────────────────────────────────────────────────────────
-2.3. [TẠO MỚI] backend/src/validators/taskValidator.ts
+2.3. [MỘT PHẦN] backend/src/validators/taskValidator.ts (schema task + query my-tasks)
 ────────────────────────────────────────────────────────────────────────────────
 
   SCHEMAS:
