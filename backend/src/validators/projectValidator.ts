@@ -17,6 +17,23 @@ const dateString = z
   .optional()
   .nullable();
 
+/** Chuỗi rỗng / chỉ khoảng trắng → không gửi nhãn (tránh lưu "" hoặc giá trị autofill rác). */
+const projectLabelOnCreate = z.preprocess((val) => {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val !== 'string') return val;
+  const t = val.trim();
+  return t === '' ? undefined : t;
+}, z.string().max(100, 'Nhãn phân loại dự án tối đa 100 ký tự').optional());
+
+/** PUT: null = xóa nhãn; undefined = không đổi; chuỗi rỗng coi như xóa. */
+const projectLabelOnUpdate = z.preprocess((val) => {
+  if (val === undefined) return undefined;
+  if (val === null) return null;
+  if (typeof val !== 'string') return val;
+  const t = val.trim();
+  return t === '' ? null : t;
+}, z.string().max(100, 'Nhãn phân loại dự án tối đa 100 ký tự').nullable().optional());
+
 /** Khi body có cả hai ngày — kiểm tra trước khi vào service (PUT chỉ validate nếu gửi đủ 2 key). */
 function refineProjectDates(
   data: { start_date?: string | null; end_date?: string | null },
@@ -50,12 +67,7 @@ export const createProjectSchema = z
   start_date: dateString,
   end_date: dateString,
   color_code: hexColor,
-  label: z
-    .string()
-    .max(100, 'Nhãn phân loại dự án tối đa 100 ký tự')
-    .transform((v) => v.trim())
-    .optional()
-    .nullable(),
+  label: projectLabelOnCreate,
   priority: projectPriorityEnum.optional().default('Medium'),
   member_ids: z.array(z.number().int().positive()).optional(),
   })
@@ -79,12 +91,7 @@ export const updateProjectSchema = z
   start_date: dateString,
   end_date: dateString,
   color_code: hexColor,
-  label: z
-    .string()
-    .max(100, 'Nhãn phân loại dự án tối đa 100 ký tự')
-    .transform((v) => v.trim())
-    .optional()
-    .nullable(),
+  label: projectLabelOnUpdate,
   priority: projectPriorityEnum.optional(),
   status: projectStatusEnum.optional(),
   })

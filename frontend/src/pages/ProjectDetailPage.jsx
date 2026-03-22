@@ -438,7 +438,7 @@ function SettingsTab({ project, onRefresh, showToast }) {
       const payload = { ...form };
       if (!payload.start_date) delete payload.start_date;
       if (!payload.end_date) delete payload.end_date;
-      if (!payload.label) payload.label = null;
+      if (!String(payload.label || "").trim()) payload.label = null;
       await projectApi.update(project.id, payload);
       showToast("Cập nhật dự án thành công");
       onRefresh();

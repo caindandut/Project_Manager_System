@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,14 @@ export default function CreateProjectDialog({ open, onOpenChange, onSuccess }) {
   const [error, setError] = useState("");
   const [chipHint, setChipHint] = useState("");
 
+  /** Mỗi lần mở dialog: form sạch, tránh giữ nhãn/chip từ lần trước hoặc autofill trình duyệt. */
+  useEffect(() => {
+    if (!open) return;
+    setForm(buildInitialForm());
+    setError("");
+    setChipHint("");
+  }, [open]);
+
   const reset = () => {
     setForm(buildInitialForm());
     setError("");
@@ -70,7 +78,7 @@ export default function CreateProjectDialog({ open, onOpenChange, onSuccess }) {
       const payload = { ...form };
       if (!payload.start_date) delete payload.start_date;
       if (!payload.end_date) delete payload.end_date;
-      if (!payload.label) delete payload.label;
+      if (!String(payload.label || "").trim()) delete payload.label;
       await projectApi.create(payload);
       reset();
       onOpenChange(false);
@@ -97,7 +105,7 @@ export default function CreateProjectDialog({ open, onOpenChange, onSuccess }) {
             Điền thông tin dự án để bắt đầu quản lý công việc.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           {error && (
             <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               <AlertCircle className="h-4 w-4 shrink-0" />

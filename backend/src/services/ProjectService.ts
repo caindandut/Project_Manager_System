@@ -14,6 +14,13 @@ import type {
 import { companyService } from './CompanyService';
 import { Project as ProjectDomain } from '../domain/entities/Project';
 
+/** Lưu DB: không lưu chuỗi rỗng; null = không có nhãn. */
+function projectLabelToDb(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const t = value.trim();
+  return t === '' ? null : t;
+}
+
 export class ProjectService {
   async createProject(input: CreateProjectInput, userId: number) {
     const companyId = await this.ensureUserCompany(userId);
@@ -40,7 +47,7 @@ export class ProjectService {
         start_date: input.start_date ? new Date(input.start_date) : null,
         end_date: input.end_date ? new Date(input.end_date) : null,
         color_code: input.color_code ?? '#2563EB',
-        label: input.label ?? null,
+        label: projectLabelToDb(input.label),
         priority: (input.priority as project_priority) ?? 'Medium',
         status: 'Active',
       },
@@ -268,7 +275,7 @@ export class ProjectService {
           end_date: input.end_date ? new Date(input.end_date) : null,
         }),
         ...(input.color_code !== undefined && { color_code: input.color_code }),
-        ...(input.label !== undefined && { label: input.label }),
+        ...(input.label !== undefined && { label: projectLabelToDb(input.label) }),
         ...(input.priority !== undefined && { priority: input.priority as project_priority }),
         ...(input.status !== undefined && { status: input.status as project_status }),
       },
