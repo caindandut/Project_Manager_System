@@ -518,7 +518,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
     getMyTasks(filters)        → GET /users/me/tasks
 
 ────────────────────────────────────────────────────────────────────────────────
-2.6. [TẠO MỚI] frontend/src/constants/taskUi.js
+2.6. [ĐÃ CÓ] frontend/src/constants/taskUi.js
 ────────────────────────────────────────────────────────────────────────────────
 
   CONSTANTS:
@@ -526,7 +526,8 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
       [ { value: 'Todo', label: 'Chưa làm', icon, color, bgColor },
         { value: 'InProgress', label: 'Đang làm', ... },
         { value: 'Review', label: 'Chờ xác nhận', ... },
-        { value: 'Completed', label: 'Hoàn thành', ... } ]
+        { value: 'Completed', label: 'Hoàn thành', ... },
+        { value: 'Overdue', label: 'Quá hạn', ... } ]  ← thêm cho khớp Prisma task_status
 
     TASK_PRIORITY_OPTIONS:
       [ { value: 'Low', label: 'Thấp', color },
