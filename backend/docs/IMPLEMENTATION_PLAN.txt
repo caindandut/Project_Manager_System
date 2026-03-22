@@ -264,10 +264,11 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
   Domain Entity sẵn: Task.ts (assertStatusTransition, assertProgress, isOverdue)
 
 ────────────────────────────────────────────────────────────────────────────────
-2.1. [TẠO MỚI] backend/src/services/TaskGroupService.ts
+2.1. [ĐÃ CÓ] backend/src/services/TaskGroupService.ts
 ────────────────────────────────────────────────────────────────────────────────
 
   MỤC ĐÍCH: CRUD nhóm công việc (từng cột trong Kanban/section trong ListView)
+  GHI CHÚ: Chưa mount HTTP — mục 2.3 sẽ nối controller/routes.
 
   METHODS:
     createTaskGroup(projectId, name, actorId):
