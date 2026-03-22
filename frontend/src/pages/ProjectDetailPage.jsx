@@ -177,7 +177,7 @@ function OverviewTab({ project }) {
 }
 
 // ─── Tab: Công việc (GĐ2 mục 2.10 — fetch + lọc + List/Kanban) ─
-function TasksTab({ project, user, showToast, canManage, onProjectRefresh }) {
+function TasksTab({ project, user, showToast, canManage, onProjectRefresh, openTaskId, onDismissUrlTask }) {
   const [taskView, setTaskView] = useState("list");
   const [taskGroups, setTaskGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
