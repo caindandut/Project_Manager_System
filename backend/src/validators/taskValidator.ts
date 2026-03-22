@@ -1,5 +1,35 @@
 import { z } from 'zod';
 
+const GROUP_NAME_MAX = 255;
+
+/** POST /projects/:projectId/task-groups */
+export const createTaskGroupSchema = z.object({
+  group_name: z
+    .string()
+    .min(1, 'Tên nhóm không được để trống')
+    .max(GROUP_NAME_MAX, `Tên nhóm tối đa ${GROUP_NAME_MAX} ký tự`)
+    .transform((v) => v.trim()),
+});
+
+/** PUT /task-groups/:id */
+export const updateTaskGroupSchema = z.object({
+  group_name: z
+    .string()
+    .min(1, 'Tên nhóm không được để trống')
+    .max(GROUP_NAME_MAX, `Tên nhóm tối đa ${GROUP_NAME_MAX} ký tự`)
+    .transform((v) => v.trim()),
+});
+
+/** PUT .../task-groups/reorder */
+export const reorderTaskGroupsSchema = z.object({
+  ordered_ids: z.array(z.number().int().positive()),
+});
+
+/** PUT /task-groups/:groupId/tasks/reorder */
+export const reorderTasksInGroupSchema = z.object({
+  ordered_ids: z.array(z.number().int().positive()),
+});
+
 const taskPriorityEnum = z.enum(['Low', 'Medium', 'High', 'Urgent']);
 const taskStatusEnum = z.enum(['Todo', 'InProgress', 'Review', 'Completed', 'Overdue']);
 const assigneeRoleEnum = z.enum(['Main', 'Support']);
@@ -119,6 +149,11 @@ export const myTasksQuerySchema = z.object({
   project_id: z.coerce.number().int().positive().optional(),
   search: z.string().trim().max(255).optional(),
 });
+
+export type CreateTaskGroupInput = z.infer<typeof createTaskGroupSchema>;
+export type UpdateTaskGroupInput = z.infer<typeof updateTaskGroupSchema>;
+export type ReorderTaskGroupsInput = z.infer<typeof reorderTaskGroupsSchema>;
+export type ReorderTasksInGroupInput = z.infer<typeof reorderTasksInGroupSchema>;
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;

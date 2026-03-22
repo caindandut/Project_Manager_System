@@ -268,7 +268,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
 ────────────────────────────────────────────────────────────────────────────────
 
   MỤC ĐÍCH: CRUD nhóm công việc (từng cột trong Kanban/section trong ListView)
-  GHI CHÚ: Chưa mount HTTP — mục 2.3 sẽ nối controller/routes.
+  GHI CHÚ: Đã mount HTTP (mục 2.4): nestedTaskGroupRouter + flatTaskGroupRouter.
 
   METHODS:
     createTaskGroup(projectId, name, actorId):
@@ -301,7 +301,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
 
   MỤC ĐÍCH: Service lớn nhất — quản lý task, subtask, assignee, dependency
   GHI CHÚ: Kèm helpers/projectAccess (dùng chung TaskGroupService). Validator taskValidator.ts.
-            Chưa mount HTTP — mục 2.3. Thông báo GĐ3 / join room project:* socket sau này.
+            Đã mount HTTP (taskRoutes, user /me/tasks). Thông báo GĐ3 / join room project:* socket sau này.
 
   METHODS CHI TIẾT:
 
@@ -394,7 +394,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
       - Reorder tasks trong group cũ và mới
 
 ────────────────────────────────────────────────────────────────────────────────
-2.3. [MỘT PHẦN] backend/src/validators/taskValidator.ts (schema task + query my-tasks)
+2.3. [ĐÃ CÓ] backend/src/validators/taskValidator.ts (schema task + task group + query my-tasks)
 ────────────────────────────────────────────────────────────────────────────────
 
   SCHEMAS:
@@ -402,9 +402,9 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
       - group_name: string, trim, 1-255
 
     updateTaskGroupSchema:
-      - group_name: string, trim, 1-255, optional
+      - group_name: string, trim, 1-255 (PUT đổi tên — body bắt buộc)
 
-    reorderSchema:
+    reorderTaskGroupsSchema / reorderTasksInGroupSchema:
       - ordered_ids: z.array(z.number().int().positive())
 
     createTaskSchema:
@@ -439,7 +439,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
   EXPORT TYPES: CreateTaskInput, UpdateTaskInput, ...
 
 ────────────────────────────────────────────────────────────────────────────────
-2.4. [TẠO MỚI] backend/src/controllers/ + routes/
+2.4. [ĐÃ CÓ] backend/src/controllers/ + routes/
 ────────────────────────────────────────────────────────────────────────────────
 
   FILES:
@@ -482,8 +482,11 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
     Assign/Unassign: Manager/Admin/creator
 
   MOUNT trong app.ts:
-    app.use('/api/projects', taskGroupRoutes);  // nested :projectId/task-groups
-    app.use('/api', taskRoutes);                // /task-groups/:groupId/tasks + /tasks/:id
+    app.use('/api/projects', nestedTaskGroupRouter);  // :projectId/task-groups (+ reorder) — trước projectRoutes
+    app.use('/api/projects', projectRoutes);
+    app.use('/api/task-groups', flatTaskGroupRouter); // PUT/DELETE :id
+    app.use('/api', taskRoutes);                      // task-groups/:groupId/tasks + tasks/...
+    GET /api/users/me/tasks → userRoutes + taskController.getMyTasks
 
 ────────────────────────────────────────────────────────────────────────────────
 2.5. [TẠO MỚI] frontend/src/api/taskApi.js + taskGroupApi.js
@@ -707,17 +710,19 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
     - Admin: tùy chọn hiện hoặc ẩn (Admin thường quản lý, ít được giao task)
 
 ────────────────────────────────────────────────────────────────────────────────
-2.13. [SỬA] backend/src/app.ts
+2.13. [ĐÃ CÓ / ĐỒNG BỘ] backend/src/app.ts
 ────────────────────────────────────────────────────────────────────────────────
 
-  THÊM:
-    import taskGroupRoutes from './routes/taskGroupRoutes';
+  ĐÃ CÓ:
+    import { nestedTaskGroupRouter, flatTaskGroupRouter } from './routes/taskGroupRoutes';
     import taskRoutes from './routes/taskRoutes';
-    app.use('/api/projects', taskGroupRoutes);
+    app.use('/api/projects', nestedTaskGroupRouter);
+    app.use('/api/projects', projectRoutes);
+    app.use('/api/task-groups', flatTaskGroupRouter);
     app.use('/api', taskRoutes);
 
-  THÊM route My Tasks trong userRoutes.ts:
-    GET /users/me/tasks → taskController.getMyTasks
+  userRoutes.ts:
+    GET /me/tasks → validate(myTasksQuerySchema,'query') + taskController.getMyTasks
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

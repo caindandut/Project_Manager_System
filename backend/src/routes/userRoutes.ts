@@ -14,6 +14,7 @@ import {
   updateProfile,
   changePassword,
 } from '../controllers/userController';
+import { getMyTasks } from '../controllers/taskController';
 import {
   createUserSchema,
   updateProfileSchema,
@@ -22,6 +23,7 @@ import {
   updateUserRoleSchema,
   updateUserStatusSchema,
 } from '../validators/userValidator';
+import { myTasksQuerySchema } from '../validators/taskValidator';
 
 const router: Router = express.Router();
 
@@ -37,6 +39,7 @@ router.use(protect);
 router.get('/profile', getProfile);
 router.put('/profile', validate(updateProfileSchema), updateProfile);
 router.put('/change-password', validate(changePasswordSchema), changePassword);
+router.get('/me/tasks', validate(myTasksQuerySchema, 'query'), getMyTasks);
 
 // Chỉ Admin mới được truy cập quản lý user
 router.get('/', authorizeRoles('Admin'), getAllUsers);

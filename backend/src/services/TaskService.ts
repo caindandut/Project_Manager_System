@@ -107,7 +107,7 @@ export type MyTasksGroupedDto = {
 };
 
 /**
- * Quản lý task — GĐ2 mục 2.2 (chưa mount HTTP — mục 2.3).
+ * Quản lý task — GĐ2 mục 2.2; HTTP mount mục 2.4 (taskRoutes, user /me/tasks).
  */
 export class TaskService {
   async createTask(taskGroupId: number, data: CreateTaskInput, creatorId: number): Promise<TaskDetailDto> {
@@ -802,6 +802,110 @@ export class TaskService {
 
     emitTaskUpdated(projectId, { task_id: taskId, project_id: projectId });
     return this.getTaskById(taskId, actorId);
+  }
+
+  /**
+   * Xóa task (cascade subtask, assignee, dependency theo Prisma).
+   * Người tạo task: Member+ (mutate). Người khác: chỉ Manager/Admin dự án.
+   */
+  async deleteTask(taskId: number, actorId: number): Promise<void> {
+    const task = await this.loadTaskForPermission(taskId);
+    if (task.creator_id != null && task.creator_id === actorId) {
+      await assertCanMutateTasksOnProject(task.project_id, actorId);
+    } else {
+      await assertManagerOrAdminOnProject(
+        task.project_id,
+        actorId,
+        'Chỉ Admin, Manager dự án hoặc người tạo task mới xóa công việc',
+      );
+    }
+
+    const projectId = task.project_id;
+    await prisma.task.delete({ where: { id: taskId } });
+
+    await prisma.activitylog.create({
+      data: {
+        user_id: actorId,
+        action: 'DELETE_TASK',
+        details: `Xóa task #${taskId}`,
+        target_table: 'task',
+        target_id: taskId,
+      },
+    });
+
+    emitTaskUpdated(projectId, { task_id: taskId, project_id: projectId });
+  }
+
+  /**
+   * Sắp xếp lại thứ tự các task gốc (không archived) trong một nhóm.
+   */
+  async reorderTasksInGroup(groupId: number, orderedIds: number[], actorId: number): Promise<void> {
+    const group = await prisma.taskgroup.findUnique({
+      where: { id: groupId },
+      select: { id: true, project_id: true },
+    });
+    if (!group || group.project_id == null) {
+      throw new NotFoundError('Không tìm thấy nhóm công việc');
+    }
+
+    await assertCanMutateTasksOnProject(group.project_id, actorId);
+
+    const roots = await prisma.task.findMany({
+      where: {
+        task_group_id: groupId,
+        parent_task_id: null,
+        is_archived: false,
+      },
+      select: { id: true },
+      orderBy: { position: 'asc' },
+    });
+    const existingSet = new Set(roots.map((r) => r.id));
+
+    if (roots.length === 0) {
+      if (orderedIds.length > 0) {
+        throw new ValidationError('Nhóm không có task gốc để sắp xếp');
+      }
+      return;
+    }
+
+    if (orderedIds.length !== roots.length) {
+      throw new ValidationError('Số lượng task không khớp với nhóm');
+    }
+
+    const seen = new Set<number>();
+    for (const id of orderedIds) {
+      if (!existingSet.has(id)) {
+        throw new ValidationError('Có task không thuộc nhóm hoặc không phải task gốc');
+      }
+      if (seen.has(id)) {
+        throw new ValidationError('Danh sách thứ tự không được trùng id');
+      }
+      seen.add(id);
+    }
+
+    await prisma.$transaction(
+      orderedIds.map((id, index) =>
+        prisma.task.update({
+          where: { id },
+          data: { position: index, updated_at: new Date() },
+        }),
+      ),
+    );
+
+    await prisma.activitylog.create({
+      data: {
+        user_id: actorId,
+        action: 'REORDER_TASKS',
+        details: `Sắp xếp lại task trong nhóm #${groupId}`,
+        target_table: 'taskgroup',
+        target_id: groupId,
+      },
+    });
+
+    emitTaskUpdated(group.project_id, {
+      task_id: orderedIds[0]!,
+      project_id: group.project_id,
+    });
   }
 
   // ─── Private ─────────────────────────────────────────────────────────────
