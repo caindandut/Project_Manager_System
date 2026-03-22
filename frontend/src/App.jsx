@@ -16,6 +16,8 @@ import ProjectsPage from '@/pages/ProjectsPage';
 import ProjectDetailPage from '@/pages/ProjectDetailPage';
 import MyTasksPage from '@/pages/MyTasksPage';
 
+/** Các vai trò được xem trang công việc được giao (GĐ2 mục 2.12). */
+const MY_TASKS_ROLES = ['Admin', 'Director', 'Employee'];
 
 function App() {
   return (
@@ -23,94 +25,103 @@ function App() {
       <SocketProvider>
         <BrowserRouter>
           <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-          <Route path="/login" element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          } />
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <LoginPage />
+                </PublicRoute>
+              }
+            />
 
-          <Route path="/forgot-password" element={
-            <PublicRoute>
-              <ForgotPasswordPage />
-            </PublicRoute>
-          } />
+            <Route
+              path="/forgot-password"
+              element={
+                <PublicRoute>
+                  <ForgotPasswordPage />
+                </PublicRoute>
+              }
+            />
 
-          <Route path="/reset-password/:token" element={
-            <PublicRoute>
-              <ResetPasswordPage />
-            </PublicRoute>
-          } />
+            <Route
+              path="/reset-password/:token"
+              element={
+                <PublicRoute>
+                  <ResetPasswordPage />
+                </PublicRoute>
+              }
+            />
 
-          {/* Trang accept-invite cần luôn truy cập được, kể cả khi đang đăng nhập */}
-          <Route path="/accept-invite" element={<AcceptInvitePage />} />
+            {/* Trang accept-invite cần luôn truy cập được, kể cả khi đang đăng nhập */}
+            <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/projects"
-            element={
-              <ProtectedRoute>
-                <ProjectsPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/projects"
+              element={
+                <ProtectedRoute>
+                  <ProjectsPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/projects/:id"
-            element={
-              <ProtectedRoute>
-                <ProjectDetailPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/projects/:id"
+              element={
+                <ProtectedRoute>
+                  <ProjectDetailPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/tasks"
-            element={
-              <ProtectedRoute allowedRoles={["Director", "Employee"]}>
-                <MyTasksPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* GĐ2 mục 2.12 — Công việc của tôi */}
+            <Route
+              path="/tasks"
+              element={
+                <ProtectedRoute allowedRoles={MY_TASKS_ROLES}>
+                  <MyTasksPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/members"
-            element={
-              <ProtectedRoute allowedRoles={["Admin"]}>
-                <MembersPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/members"
+              element={
+                <ProtectedRoute allowedRoles={["Admin"]}>
+                  <MembersPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute allowedRoles={["Admin"]}>
-                <SettingsPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute allowedRoles={["Admin"]}>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="*" element={<NotFoundPage />} />
-
           </Routes>
         </BrowserRouter>
       </SocketProvider>

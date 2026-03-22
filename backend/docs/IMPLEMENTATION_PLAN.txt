@@ -697,15 +697,17 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
   Click task → /projects/:id?tab=tasks&task=:taskId → ProjectDetailPage mở tab + TaskDetailPanel
 
 ────────────────────────────────────────────────────────────────────────────────
-2.12. [ĐÃ CÓ / ĐỒNG BỘ] frontend/src/App.jsx + DashboardLayout.jsx
+2.12. [ĐÃ CÓ] frontend/src/App.jsx + DashboardLayout.jsx
 ────────────────────────────────────────────────────────────────────────────────
 
   App.jsx:
-    + Route /tasks → MyTasksPage (Protected, Director + Employee)
+    + Route /tasks → MyTasksPage (ProtectedRoute, allowedRoles: Admin + Director + Employee)
+    + Hằng MY_TASKS_ROLES tập trung cấu hình vai trò
 
   DashboardLayout.jsx:
-    - Link "Công việc của tôi" /tasks bật cho Director + Employee
-    - Admin: không có mục này trong nav (theo plan)
+    + Link "Công việc của tôi" → /tasks (bỏ disabled / badge "Sắp ra mắt" cho mục này)
+    + Admin, Director, Employee: đều có mục Công việc của tôi trong main nav
+    + Sửa class hover sidebar: hover:bg-white/10
 
 ────────────────────────────────────────────────────────────────────────────────
 2.13. [ĐÃ CÓ / ĐỒNG BỘ] backend/src/app.ts

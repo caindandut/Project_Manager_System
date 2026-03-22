@@ -15,11 +15,15 @@ import {
   LogOut,
 } from "lucide-react";
 
+/**
+ * Điều hướng sidebar theo vai trò (GĐ2 mục 2.12: /tasks bật cho mọi vai trò có menu).
+ */
 const NAV_BY_ROLE = {
   Admin: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
+      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
       { label: "Thành viên", icon: Users, href: "/members" },
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
     ],
@@ -77,7 +81,7 @@ function NavItem({ icon: Icon, label, href, badge, active, disabled, onNavigate 
     "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors";
   const enabledClasses = active
     ? "bg-blue-600 text-white"
-    : "text-slate-300 hover:bg:white/10 hover:text-white";
+    : "text-slate-300 hover:bg-white/10 hover:text-white";
   const disabledClasses = "text-slate-500/60 cursor-not-allowed";
 
   const handleClick = (e) => {
