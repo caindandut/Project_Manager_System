@@ -14,6 +14,7 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AcceptInvitePage from '@/pages/AcceptInvitePage';
 import ProjectsPage from '@/pages/ProjectsPage';
 import ProjectDetailPage from '@/pages/ProjectDetailPage';
+import MyTasksPage from '@/pages/MyTasksPage';
 
 
 function App() {
@@ -68,6 +69,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProjectDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/tasks"
+            element={
+              <ProtectedRoute allowedRoles={["Director", "Employee"]}>
+                <MyTasksPage />
               </ProtectedRoute>
             }
           />

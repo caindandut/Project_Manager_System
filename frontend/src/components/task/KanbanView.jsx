@@ -300,6 +300,8 @@ export default function KanbanView({
   canEditTasks = false,
   canManageProject = false,
   onTaskUpdated,
+  openTaskId = null,
+  onDismissOpenTask,
 }) {
   const [columns, setColumns] = useState({
     Todo: [],
@@ -481,7 +483,10 @@ export default function KanbanView({
 
       <TaskDetailPanel
         taskId={selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={() => {
+          setSelectedTaskId(null);
+          onDismissOpenTask?.();
+        }}
         showToast={showToast}
         canEditTasks={canEditTasks}
         canManageProject={canManageProject}

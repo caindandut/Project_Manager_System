@@ -31,7 +31,7 @@ const NAV_BY_ROLE = {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
-      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks", disabled: true },
+      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
       { label: "Thành viên", icon: Users, href: "/members" },
     ],
     system: [
@@ -42,7 +42,7 @@ const NAV_BY_ROLE = {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
-      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks", disabled: true },
+      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
     ],
     system: [
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },

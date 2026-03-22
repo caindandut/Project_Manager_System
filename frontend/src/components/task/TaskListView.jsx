@@ -347,6 +347,9 @@ export default function TaskListView({
   canEditTasks = false,
   canManageProject = false,
   onTaskUpdated,
+  /** Mở TaskDetailPanel từ URL (?task=) */
+  openTaskId = null,
+  onDismissOpenTask,
 }) {
   const [openMap, setOpenMap] = useState({});
   const [activeTask, setActiveTask] = useState(null);
@@ -359,6 +362,12 @@ export default function TaskListView({
   const [selectedTaskId, setSelectedTaskId] = useState(null);
 
   const [quickTitle, setQuickTitle] = useState({});
+
+  useEffect(() => {
+    if (openTaskId != null && Number.isFinite(openTaskId)) {
+      setSelectedTaskId(openTaskId);
+    }
+  }, [openTaskId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -645,7 +654,10 @@ export default function TaskListView({
 
       <TaskDetailPanel
         taskId={selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={() => {
+          setSelectedTaskId(null);
+          onDismissOpenTask?.();
+        }}
         showToast={showToast}
         canEditTasks={canEditTasks}
         canManageProject={canManageProject}

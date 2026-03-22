@@ -673,10 +673,10 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
     - onTaskUpdated: refresh project + reload nhóm qua onReloadGroups
 
 ────────────────────────────────────────────────────────────────────────────────
-2.11. [TẠO MỚI] frontend/src/pages/MyTasksPage.jsx
+2.11. [ĐÃ CÓ] frontend/src/pages/MyTasksPage.jsx
 ────────────────────────────────────────────────────────────────────────────────
 
-  ROUTE: /tasks (Protected, Director + Employee)
+  ROUTE: /tasks (Protected, Director + Employee) — đã thêm App.jsx + bật nav DashboardLayout
 
   CẤU TRÚC UI:
     ┌─────────────────────────────────────────────────────────┐
@@ -693,21 +693,19 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
     │ Tổng: 5 chưa làm │ 12 đang làm │ 3 chờ review │ 4 xong│
     └─────────────────────────────────────────────────────────┘
 
-  API: GET /users/me/tasks → nhóm theo project
-  Click task → navigate tới /projects/:id?tab=tasks&task=:taskId
-  (hoặc mở TaskDetailPanel inline)
+  API: GET /users/me/tasks → nhóm theo project (lọc status/priority/search server; lọc dự án client)
+  Click task → /projects/:id?tab=tasks&task=:taskId → ProjectDetailPage mở tab + TaskDetailPanel
 
 ────────────────────────────────────────────────────────────────────────────────
-2.12. [SỬA] frontend/src/App.jsx + DashboardLayout.jsx
+2.12. [ĐÃ CÓ / ĐỒNG BỘ] frontend/src/App.jsx + DashboardLayout.jsx
 ────────────────────────────────────────────────────────────────────────────────
 
   App.jsx:
-    + Route /tasks → MyTasksPage (Protected)
+    + Route /tasks → MyTasksPage (Protected, Director + Employee)
 
   DashboardLayout.jsx:
-    - Bật link "Công việc của tôi" (bỏ disabled, bỏ tooltip "Sắp ra mắt")
-    - Director + Employee: hiện link /tasks
-    - Admin: tùy chọn hiện hoặc ẩn (Admin thường quản lý, ít được giao task)
+    - Link "Công việc của tôi" /tasks bật cho Director + Employee
+    - Admin: không có mục này trong nav (theo plan)
 
 ────────────────────────────────────────────────────────────────────────────────
 2.13. [ĐÃ CÓ / ĐỒNG BỘ] backend/src/app.ts

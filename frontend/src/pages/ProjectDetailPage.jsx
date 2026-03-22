@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,6 +104,7 @@ const TABS = [
   { key: "documents", label: "Tài liệu", icon: FileText },
   { key: "settings", label: "Cài đặt", icon: Settings },
 ];
+const TAB_KEYS = new Set(TABS.map((t) => t.key));
 
 // ─── Tab: Tổng quan ─────────────────────────────────────────
 function OverviewTab({ project }) {
@@ -285,6 +286,8 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh }) {
           canEditTasks={canEditTasks}
           canManageProject={canManage}
           onTaskUpdated={onProjectRefresh}
+          openTaskId={openTaskId}
+          onDismissOpenTask={onDismissUrlTask}
         />
       ) : (
         <KanbanView
@@ -298,6 +301,8 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh }) {
           canEditTasks={canEditTasks}
           canManageProject={canManage}
           onTaskUpdated={onProjectRefresh}
+          openTaskId={openTaskId}
+          onDismissOpenTask={onDismissUrlTask}
         />
       )}
     </div>
@@ -690,6 +695,7 @@ function SettingsTab({ project, onRefresh, showToast }) {
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -699,6 +705,21 @@ export default function ProjectDetailPage() {
 
   const isManager = project?.members?.some((m) => m.id === user?.id && m.project_role === "Manager");
   const canManage = user?.role === "Admin" || isManager;
+
+  const dismissTaskFromUrl = useCallback(() => {
+    const p = new URLSearchParams(searchParams);
+    p.delete("task");
+    setSearchParams(p, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const urlTaskRaw = searchParams.get("task");
+  const urlOpenTaskId =
+    urlTaskRaw != null && urlTaskRaw !== ""
+      ? (() => {
+          const n = parseInt(urlTaskRaw, 10);
+          return Number.isFinite(n) && n > 0 ? n : null;
+        })()
+      : null;
 
   const fetchProject = useCallback(async () => {
     try {
@@ -792,6 +813,8 @@ export default function ProjectDetailPage() {
                 showToast={showToast}
                 canManage={canManage}
                 onProjectRefresh={fetchProject}
+                openTaskId={urlOpenTaskId}
+                onDismissUrlTask={dismissTaskFromUrl}
               />
             )}
             {activeTab === "members" && <MembersTab project={project} canManage={canManage} onRefresh={fetchProject} showToast={showToast} />}
