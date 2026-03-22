@@ -710,19 +710,19 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
     + Sửa class hover sidebar: hover:bg-white/10
 
 ────────────────────────────────────────────────────────────────────────────────
-2.13. [ĐÃ CÓ / ĐỒNG BỘ] backend/src/app.ts
+2.13. [ĐÃ CÓ] backend/src/app.ts + đồng bộ userRoutes
 ────────────────────────────────────────────────────────────────────────────────
 
-  ĐÃ CÓ:
-    import { nestedTaskGroupRouter, flatTaskGroupRouter } from './routes/taskGroupRoutes';
-    import taskRoutes from './routes/taskRoutes';
-    app.use('/api/projects', nestedTaskGroupRouter);
-    app.use('/api/projects', projectRoutes);
-    app.use('/api/task-groups', flatTaskGroupRouter);
-    app.use('/api', taskRoutes);
+  app.ts:
+    - Import nestedTaskGroupRouter, flatTaskGroupRouter, taskRoutes
+    - Mount (thứ tự): /api/projects → nestedTaskGroupRouter → projectRoutes
+    - /api/task-groups → flatTaskGroupRouter
+    - /api → taskRoutes
+    - Comment JSDoc mục 2.13 (ý nghĩa từng mount)
 
   userRoutes.ts:
-    GET /me/tasks → validate(myTasksQuerySchema,'query') + taskController.getMyTasks
+    - GET /me/tasks → protect + validate(myTasksQuerySchema,'query') + getMyTasks
+    - Full URL: GET /api/users/me/tasks
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

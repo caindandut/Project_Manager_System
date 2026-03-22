@@ -26,6 +26,15 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/company', companyRoutes);
+
+/**
+ * GĐ2 mục 2.13 — Task & task group (Express: mount trước/sau ảnh hưởng khớp route).
+ * - nestedTaskGroupRouter @ /api/projects → GET|POST …/projects/:projectId/task-groups, PUT …/reorder
+ * - projectRoutes @ /api/projects → CRUD dự án, members, stats (:id một segment)
+ * - flatTaskGroupRouter @ /api/task-groups → PUT|DELETE /api/task-groups/:id
+ * - taskRoutes @ /api → POST …/task-groups/:groupId/tasks, CRUD …/tasks/:id, status, assignees, …
+ * Công việc của tôi: GET /api/users/me/tasks (app.use('/api/users', userRoutes) — getMyTasks).
+ */
 app.use('/api/projects', nestedTaskGroupRouter);
 app.use('/api/projects', projectRoutes);
 app.use('/api/task-groups', flatTaskGroupRouter);

@@ -39,6 +39,7 @@ router.use(protect);
 router.get('/profile', getProfile);
 router.put('/profile', validate(updateProfileSchema), updateProfile);
 router.put('/change-password', validate(changePasswordSchema), changePassword);
+/** GĐ2 mục 2.13 — đồng bộ với app.use('/api/users', userRoutes) → GET /api/users/me/tasks */
 router.get('/me/tasks', validate(myTasksQuerySchema, 'query'), getMyTasks);
 
 // Chỉ Admin mới được truy cập quản lý user
