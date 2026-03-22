@@ -489,7 +489,7 @@ V. GIAI ĐOẠN 2: QUẢN LÝ CÔNG VIỆC — ❌ CHƯA BẮT ĐẦU
     GET /api/users/me/tasks → userRoutes + taskController.getMyTasks
 
 ────────────────────────────────────────────────────────────────────────────────
-2.5. [TẠO MỚI] frontend/src/api/taskApi.js + taskGroupApi.js
+2.5. [ĐÃ CÓ] frontend/src/api/taskApi.js + taskGroupApi.js
 ────────────────────────────────────────────────────────────────────────────────
 
   taskGroupApi.js:
