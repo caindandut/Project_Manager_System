@@ -47,6 +47,11 @@ function formatDate(value) {
 export default function DocumentExplorer({ projectId, showToast, canManage = false }) {
   const [parentId, setParentId] = useState(null);
   const [path, setPath] = useState([]); // stack [{id,file_name}]
+  const showToastRef = useRef(showToast);
+
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
 
   const [viewMode, setViewMode] = useState("grid"); // grid | list
   const [items, setItems] = useState([]);
@@ -76,12 +81,12 @@ export default function DocumentExplorer({ projectId, showToast, canManage = fal
       const data = res?.data?.data ?? {};
       setItems(Array.isArray(data) ? data : data.items ? data.items : data);
     } catch (err) {
-      showToast?.(err.response?.data?.message || "Không tải được tài liệu", "error");
+      showToastRef.current?.(err.response?.data?.message || "Không tải được tài liệu", "error");
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [projectId, parentId, showToast]);
+  }, [projectId, parentId]);
 
   useEffect(() => {
     void refresh();
