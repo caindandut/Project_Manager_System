@@ -70,6 +70,7 @@ import {
   hasActiveTaskFilters,
   countTasksInGroups,
 } from "@/utils/taskFilters";
+import DocumentExplorer from "@/components/document/DocumentExplorer";
 
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
@@ -514,14 +515,8 @@ function MembersTab({ project, canManage, onRefresh, showToast }) {
 }
 
 // ─── Tab: Tài liệu (placeholder GĐ4) ──────────────────────
-function DocumentsTab() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <FileText className="h-12 w-12 text-slate-300" />
-      <p className="mt-3 text-sm font-medium text-slate-500">Quản lý tài liệu sẽ được triển khai ở Giai đoạn 4</p>
-      <p className="mt-1 text-xs text-slate-400">Bao gồm: Upload file, thư mục, liên kết Google Drive</p>
-    </div>
-  );
+function DocumentsTab({ project, canManage, showToast }) {
+  return <DocumentExplorer projectId={project?.id} showToast={showToast} canManage={canManage} />;
 }
 
 function projectToSettingsForm(p) {
@@ -818,7 +813,7 @@ export default function ProjectDetailPage() {
               />
             )}
             {activeTab === "members" && <MembersTab project={project} canManage={canManage} onRefresh={fetchProject} showToast={showToast} />}
-            {activeTab === "documents" && <DocumentsTab />}
+            {activeTab === "documents" && <DocumentsTab project={project} canManage={canManage} showToast={showToast} />}
             {activeTab === "settings" && canManage && <SettingsTab project={project} onRefresh={fetchProject} showToast={showToast} />}
           </>
         ) : null}

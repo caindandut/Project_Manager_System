@@ -1054,7 +1054,7 @@ VIII. GIAI ĐOẠN 5: QUẢN LÝ TÀI LIỆU — ✅ ĐÃ TRIỂN KHAI 5.1 (TÙY
   Route mount: gắn vào projectRoutes hoặc tạo documentRoutes riêng
 
 ────────────────────────────────────────────────────────────────────────────────
-5.3. [TẠO MỚI] frontend/src/components/document/DocumentExplorer.jsx
+5.3. [TẠO MỚI] frontend/src/components/document/DocumentExplorer.jsx — ✅ ĐÃ TRIỂN KHAI
 ────────────────────────────────────────────────────────────────────────────────
 
   MỤC ĐÍCH: Tích hợp vào Tab "Tài liệu" của ProjectDetailPage
@@ -1075,8 +1075,8 @@ VIII. GIAI ĐOẠN 5: QUẢN LÝ TÀI LIỆU — ✅ ĐÃ TRIỂN KHAI 5.1 (TÙY
     - Breadcrumb navigation
     - Grid/List view toggle
     - Click folder → navigate vào
-    - Click file → download (hoặc preview nếu image/PDF)
-    - Context menu: Download, Rename, Delete
+    - Click file → download
+    - Context menu: Download, Delete
     - Drag & drop upload từ desktop
 
 
