@@ -1,7 +1,7 @@
 import { message_type } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/AppError';
-import { getIo } from '../socket/socketServer';
+import { getIo, joinChatRoom } from '../socket/socketServer';
 import { SOCKET_EVENTS } from '../socket/socketEvents';
 import { notificationService } from './NotificationService';
 
@@ -98,6 +98,9 @@ export class ChatService {
       return created;
     });
 
+    // Nếu các user đang online, đảm bảo sockets của họ đã join room chat mới tạo.
+    await Promise.all(finalMemberIds.map((uid) => joinChatRoom(uid).catch(() => undefined)));
+
     return prisma.chatgroup.findUnique({
       where: { id: group.id },
       include: {
@@ -184,6 +187,7 @@ export class ChatService {
       return ids.includes(userId) && ids.includes(targetUserId);
     });
 
+    let createdGroupId: number | null = null;
     const groupId = existing
       ? existing.id
       : (
@@ -197,9 +201,14 @@ export class ChatService {
               { chat_group_id: created.id, user_id: targetUserId },
             ],
           });
+          createdGroupId = created.id;
           return created;
         })
       ).id;
+
+    if (createdGroupId != null) {
+      await Promise.all([userId, targetUserId].map((uid) => joinChatRoom(uid).catch(() => undefined)));
+    }
 
     return prisma.chatgroup.findUnique({
       where: { id: groupId },

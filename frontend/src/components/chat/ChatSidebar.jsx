@@ -1,4 +1,5 @@
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 function countUnread(_group) {
   // Backend hiện chưa trả unread_count theo nhóm, giữ 0 để UI ổn định.
@@ -11,10 +12,12 @@ export default function ChatSidebar({
   search,
   onSearchChange,
   onSelectGroup,
+  onOpenDirect,
+  onOpenGroup,
 }) {
   return (
     <aside className="flex h-full w-full max-w-[320px] flex-col border-r border-slate-200 bg-white">
-      <div className="border-b border-slate-200 p-3">
+      <div className="border-b border-slate-200 p-3 space-y-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -23,6 +26,17 @@ export default function ChatSidebar({
             placeholder="Tìm nhóm chat..."
             className="h-10 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none transition focus:border-blue-400"
           />
+        </div>
+
+        <div className="flex gap-2">
+          <Button type="button" size="sm" variant="outline" className="w-full gap-2" onClick={onOpenDirect}>
+            <Plus className="h-4 w-4 rotate-45" />
+            1-1
+          </Button>
+          <Button type="button" size="sm" className="w-full gap-2 bg-blue-600 hover:bg-blue-700" onClick={onOpenGroup}>
+            <Plus className="h-4 w-4" />
+            Nhóm
+          </Button>
         </div>
       </div>
 

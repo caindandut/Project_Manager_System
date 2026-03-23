@@ -7,6 +7,18 @@ import MessageInput from "@/components/chat/MessageInput";
 import chatApi from "@/api/chatApi";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/hooks/useSocket";
+import projectApi from "@/api/projectApi";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const LIMIT = 20;
 
@@ -24,6 +36,25 @@ export default function ChatPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [sending, setSending] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+
+  // Dialog: tạo chat 1-1
+  const [directOpen, setDirectOpen] = useState(false);
+  const [directProjectId, setDirectProjectId] = useState("");
+  const [directMembers, setDirectMembers] = useState([]);
+  const [directMembersLoading, setDirectMembersLoading] = useState(false);
+  const [directTargetId, setDirectTargetId] = useState("");
+  const [directError, setDirectError] = useState("");
+
+  // Dialog: tạo nhóm chat
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [groupProjectId, setGroupProjectId] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [groupMembersLoading, setGroupMembersLoading] = useState(false);
+  const [groupMemberIds, setGroupMemberIds] = useState(() => new Set());
+  const [groupError, setGroupError] = useState("");
 
   const activeGroupId = useMemo(() => {
     const n = Number(groupId);
@@ -49,6 +80,53 @@ export default function ChatPage() {
   useEffect(() => {
     void loadGroups();
   }, [loadGroups]);
+
+  const loadProjects = useCallback(async () => {
+    setProjectsLoading(true);
+    try {
+      const res = await projectApi.getAll();
+      setProjects(res.data.data || []);
+    } catch {
+      setProjects([]);
+    } finally {
+      setProjectsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  const ensureProjectMembers = useCallback(async ({ projectId, kind }) => {
+    const pid = Number(projectId);
+    if (!Number.isInteger(pid) || pid <= 0) return;
+
+    if (kind === "direct") {
+      setDirectMembersLoading(true);
+      setDirectMembers([]);
+      try {
+        const res = await projectApi.getMembers(pid);
+        setDirectMembers(res.data.data || []);
+      } catch {
+        setDirectMembers([]);
+      } finally {
+        setDirectMembersLoading(false);
+      }
+    }
+
+    if (kind === "group") {
+      setGroupMembersLoading(true);
+      setGroupMembers([]);
+      try {
+        const res = await projectApi.getMembers(pid);
+        setGroupMembers(res.data.data || []);
+      } catch {
+        setGroupMembers([]);
+      } finally {
+        setGroupMembersLoading(false);
+      }
+    }
+  }, []);
 
   const filteredGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -133,6 +211,89 @@ export default function ChatPage() {
     }
   };
 
+  const openDirectDialog = () => {
+    setDirectError("");
+    setDirectOpen(true);
+    const firstProject = projects?.[0]?.id;
+    setDirectProjectId(firstProject ? String(firstProject) : "");
+    setDirectTargetId("");
+    setDirectMembers([]);
+  };
+
+  const openGroupDialog = () => {
+    setGroupError("");
+    setGroupOpen(true);
+    const firstProject = projects?.[0]?.id;
+    setGroupProjectId(firstProject ? String(firstProject) : "");
+    setGroupName("");
+    setGroupMemberIds(new Set(user?.id ? [user.id] : []));
+    setGroupMembers([]);
+  };
+
+  useEffect(() => {
+    if (directOpen && directProjectId) {
+      void ensureProjectMembers({ projectId: directProjectId, kind: "direct" });
+    }
+  }, [directOpen, directProjectId, ensureProjectMembers]);
+
+  useEffect(() => {
+    if (groupOpen && groupProjectId) {
+      void ensureProjectMembers({ projectId: groupProjectId, kind: "group" });
+    }
+  }, [groupOpen, groupProjectId, ensureProjectMembers]);
+
+  const toggleGroupMember = (uid) => {
+    setGroupMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      if (user?.id && uid !== user.id && !next.has(user.id)) next.add(user.id);
+      return next;
+    });
+  };
+
+  const createDirectChat = async () => {
+    setDirectError("");
+    if (!directTargetId) return;
+    try {
+      const targetIdNum = Number(directTargetId);
+      const res = await chatApi.getOrCreateDirect(targetIdNum);
+      const group = res?.data?.data?.group;
+      if (group?.id) {
+        setDirectOpen(false);
+        navigate(`/chat/${group.id}`);
+      }
+    } catch (err) {
+      setDirectError(err?.response?.data?.message || "Không thể tạo chat 1-1");
+    }
+  };
+
+  const createGroupChat = async () => {
+    setGroupError("");
+    try {
+      if (!groupProjectId) throw new Error("Chưa chọn dự án");
+      const pid = Number(groupProjectId);
+      const memberIds = Array.from(groupMemberIds).map((x) => Number(x)).filter((x) => Number.isInteger(x));
+      if (memberIds.length < 2) {
+        throw new Error("Nhóm chat cần ít nhất 2 thành viên");
+      }
+
+      const res = await chatApi.createGroup({
+        project_id: pid,
+        name: groupName.trim() || null,
+        member_ids: memberIds,
+      });
+
+      const created = res?.data?.data;
+      if (created?.id) {
+        setGroupOpen(false);
+        navigate(`/chat/${created.id}`);
+      }
+    } catch (err) {
+      setGroupError(err?.response?.data?.message || err?.message || "Không thể tạo nhóm chat");
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="h-[calc(100vh-64px)] p-4 sm:p-6">
@@ -143,6 +304,8 @@ export default function ChatPage() {
             search={search}
             onSearchChange={setSearch}
             onSelectGroup={(id) => navigate(`/chat/${id}`)}
+            onOpenDirect={openDirectDialog}
+            onOpenGroup={openGroupDialog}
           />
 
           <section className="flex min-h-0 flex-col">
@@ -201,6 +364,143 @@ export default function ChatPage() {
           </aside>
         </div>
       </div>
+
+      {/* Dialog: chat 1-1 */}
+      <Dialog open={directOpen} onOpenChange={setDirectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Chat 1-1</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Dự án</Label>
+              <Select value={directProjectId} onValueChange={setDirectProjectId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Chọn dự án" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(projects || []).map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.project_name || p.project_name || p.project_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Người nhận</Label>
+              <div className="max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white">
+                {directMembersLoading && <p className="p-3 text-xs text-slate-500">Đang tải...</p>}
+                {!directMembersLoading && directMembers.length === 0 && (
+                  <p className="p-3 text-xs text-slate-500">Chưa có thành viên</p>
+                )}
+                {!directMembersLoading &&
+                  directMembers
+                    .filter((m) => m.id !== user?.id)
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                          String(directTargetId) === String(m.id) ? "bg-blue-50" : ""
+                        }`}
+                        onClick={() => setDirectTargetId(String(m.id))}
+                      >
+                        {m.full_name || m.email}
+                      </button>
+                    ))}
+              </div>
+            </div>
+
+            {directError && <p className="text-sm text-red-600">{directError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDirectOpen(false)}>
+              Hủy
+            </Button>
+            <Button type="button" disabled={!directTargetId} onClick={() => void createDirectChat()}>
+              Tạo chat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: tạo nhóm chat */}
+      <Dialog open={groupOpen} onOpenChange={setGroupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tạo nhóm chat</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Dự án</Label>
+              <Select value={groupProjectId} onValueChange={setGroupProjectId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Chọn dự án" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(projects || []).map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.project_name || p.project_name || p.project_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Tên nhóm (tùy chọn)</Label>
+              <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="VD: Nhóm UI/Backend" />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Thành viên</Label>
+              <div className="max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white p-2">
+                {groupMembersLoading && <p className="text-xs text-slate-500">Đang tải...</p>}
+                {!groupMembersLoading && groupMembers.length === 0 && (
+                  <p className="text-xs text-slate-500">Chưa có thành viên</p>
+                )}
+                {!groupMembersLoading &&
+                  groupMembers.map((m) => {
+                    const checked = groupMemberIds.has(m.id);
+                    return (
+                      <label key={m.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleGroupMember(m.id)}
+                        />
+                        <span className="text-sm text-slate-800">{m.full_name || m.email}</span>
+                      </label>
+                    );
+                  })}
+              </div>
+              <p className="text-xs text-slate-500">
+                Nhóm chat cần ít nhất 2 thành viên.
+              </p>
+            </div>
+
+            {groupError && <p className="text-sm text-red-600">{groupError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setGroupOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              disabled={groupMemberIds.size < 2}
+              onClick={() => void createGroupChat()}
+            >
+              Tạo nhóm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
