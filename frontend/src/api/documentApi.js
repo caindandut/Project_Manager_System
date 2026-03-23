@@ -6,7 +6,10 @@ const documentApi = {
    * @param {number|null} [parentId]
    */
   getDocuments: (projectId, parentId = null) =>
-    axiosClient.get(`/projects/${projectId}/documents`, { params: { parentId } }),
+    axiosClient.get(`/projects/${projectId}/documents`, {
+      // Không gửi param khi root để tránh serialize thành chuỗi "null".
+      params: parentId == null ? {} : { parentId },
+    }),
 
   createFolder: (projectId, { name, parentId = null }) =>
     axiosClient.post(`/projects/${projectId}/documents/folder`, { name, parentId }),
