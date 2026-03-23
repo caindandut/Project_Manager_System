@@ -11,6 +11,7 @@ import taskRoutes from './routes/taskRoutes';
 import commentRoutes from './routes/commentRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import chatRoutes from './routes/chatRoutes';
+import documentRoutes from './routes/documentRoutes';
 import { notFound, errorHandler } from './middlewares/errorMiddleware';
 import { initSocket } from './socket/socketServer';
 
@@ -44,6 +45,7 @@ app.use('/api/task-groups', flatTaskGroupRouter);
 app.use('/api', commentRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api', documentRoutes);
 app.use('/api', taskRoutes);
 
 app.get('/', (_req: Request, res: Response): void => {

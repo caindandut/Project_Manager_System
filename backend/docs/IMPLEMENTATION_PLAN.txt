@@ -1040,7 +1040,7 @@ VIII. GIAI ĐOẠN 5: QUẢN LÝ TÀI LIỆU — ✅ ĐÃ TRIỂN KHAI 5.1 (TÙY
       - Create document { type: File, file_name, file_path: url, ... }
 
 ────────────────────────────────────────────────────────────────────────────────
-5.2. [TẠO MỚI] Controllers + Routes
+5.2. [TẠO MỚI] Controllers + Routes — ✅ ĐÃ TRIỂN KHAI
 ────────────────────────────────────────────────────────────────────────────────
 
   API — Document:

@@ -34,31 +34,29 @@ type DocumentRow = {
 };
 
 function toDbFilePath(filePath: string, uploadsRootAbs: string): string {
-  // Tránh vượt độ dài VARCHAR(255) nếu lưu đường dẫn tuyệt đối quá dài.
-  // Ưu tiên lưu đường dẫn tương đối trong phạm vi `/uploads/...`.
+  // Lưu theo dạng tương đối trong phạm vi `/uploads/...` để frontend/backend
+  // có thể resolve file dễ dàng khi download/delete.
   if (!filePath) return '';
-  const normalized = filePath.replace(/\\/g, '/');
-  const uploadsRootNorm = uploadsRootAbs.replace(/\\/g, '/');
 
-  const idx = normalized.lastIndexOf(uploadsRootNorm);
-  if (idx >= 0) {
-    return normalized.slice(idx);
+  const absUploads = path.resolve(uploadsRootAbs);
+  const absFile = path.resolve(filePath);
+  const rel = path.relative(absUploads, absFile);
+
+  // Nếu không thuộc cây uploads thì fallback giữ nguyên đường dẫn.
+  if (rel.startsWith('..') || rel.includes(':')) {
+    return filePath.replace(/\\/g, '/');
   }
 
-  if (path.isAbsolute(filePath)) {
-    // Nếu không cắt được theo uploadsRootAbs thì fallback lưu trực tiếp (có thể vẫn ngắn đủ trong đa số trường hợp).
-    return filePath;
-  }
-
-  return normalized;
+  // Bảo đảm không có dấu leading slash.
+  const relNorm = rel.replace(/\\/g, '/');
+  return `uploads/${relNorm}`;
 }
 
 function resolveFsPath(dbPath: string): string | null {
   if (!dbPath) return null;
   if (dbPath.startsWith('http://') || dbPath.startsWith('https://')) return null;
 
-  // Nếu dbPath là đường dẫn tương đối kiểu `uploads/documents/...`
-  // thì resolve theo project root.
+
   return path.isAbsolute(dbPath) ? dbPath : path.resolve(process.cwd(), dbPath);
 }
 
@@ -140,9 +138,9 @@ export class DocumentService {
   async getDocuments(
     projectId: number,
     parentFolderId: number | null | undefined,
+    userId: number,
   ): Promise<Omit<DocumentRow, 'parent_folder_id'>[]> {
-    // Không dùng assertProjectAccess vì spec không nhận userId.
-    // Controller sẽ handle phân quyền theo thực tế ở GĐ5. (Ở đây chỉ list theo projectId.)
+    await assertProjectAccess(projectId, userId);
     const parentId = parentFolderId ?? null;
     const rows = await prisma.document.findMany({
       where: { project_id: projectId, parent_folder_id: parentId },
@@ -177,7 +175,8 @@ export class DocumentService {
     }));
   }
 
-  async getDocumentTree(projectId: number): Promise<DocumentNode[]> {
+  async getDocumentTree(projectId: number, userId: number): Promise<DocumentNode[]> {
+    await assertProjectAccess(projectId, userId);
     const rows = await prisma.document.findMany({
       where: { project_id: projectId },
       select: {
@@ -227,16 +226,22 @@ export class DocumentService {
     return build(null);
   }
 
-  async downloadDocument(documentId: number): Promise<{ file_path: string }> {
+  async downloadDocument(documentId: number, userId: number): Promise<{ file_path: string }> {
     const doc = await prisma.document.findUnique({
       where: { id: documentId },
-      select: { id: true, file_path: true },
+      select: { id: true, file_path: true, project_id: true },
     });
 
     if (!doc) throw new NotFoundError('Không tìm thấy tài liệu');
     if (!doc.file_path) {
       throw new ValidationError('Tài liệu không có đường dẫn tải');
     }
+
+    if (doc.project_id == null) {
+      throw new NotFoundError('Tài liệu không thuộc dự án nào');
+    }
+
+    await assertProjectAccess(doc.project_id, userId);
 
     return { file_path: doc.file_path };
   }
