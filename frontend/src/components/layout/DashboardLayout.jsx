@@ -9,11 +9,11 @@ import {
   UserCircle,
   Settings,
   Search,
-  Bell,
   Menu,
   X,
   LogOut,
 } from "lucide-react";
+import NotificationDropdown from "@/components/notification/NotificationDropdown";
 
 /**
  * Điều hướng sidebar theo vai trò (GĐ2 mục 2.12: /tasks bật cho mọi vai trò có menu).
@@ -236,14 +236,7 @@ export default function DashboardLayout({ children }) {
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
-            <button
-              className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 transition-colors"
-              type="button"
-              title="Thông báo (sắp ra mắt)"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
-            </button>
+            <NotificationDropdown />
           </div>
         </header>
 
