@@ -3,6 +3,7 @@ import { ValidationError, NotFoundError } from '../utils/AppError';
 import { assertManagerOrAdminOnProject, assertProjectAccess } from './helpers/projectAccess';
 import { getIo } from '../socket/socketServer';
 import { SOCKET_EVENTS } from '../socket/socketEvents';
+import { notificationService } from './NotificationService';
 
 const userSelect = {
   id: true,
@@ -108,13 +109,8 @@ export class CommentService {
 
     const recipientIds = Array.from(new Set(assignees.map((a) => a.user_id))).filter((id) => id !== userId);
     if (recipientIds.length) {
-      await prisma.notification.createMany({
-        data: recipientIds.map((recipientId) => ({
-          user_id: recipientId,
-          content: `${actorName} bình luận trên task "${task.title}"`,
-          link_url: null,
-        })),
-      });
+      const message = `${actorName} bình luận trên task "${task.title}"`;
+      await Promise.all(recipientIds.map((recipientId) => notificationService.createNotification(recipientId, message)));
     }
 
     return dto;
