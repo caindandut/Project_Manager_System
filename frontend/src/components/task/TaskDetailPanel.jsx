@@ -25,7 +25,6 @@ import {
   Link2,
   ListTodo,
   Loader2,
-  MessageSquare,
   Paperclip,
   Plus,
   Trash2,
@@ -36,6 +35,7 @@ import { useAuth } from "@/context/AuthContext";
 import taskApi from "@/api/taskApi";
 import taskGroupApi from "@/api/taskGroupApi";
 import projectApi from "@/api/projectApi";
+import TaskComments from "@/components/task/TaskComments";
 import {
   TASK_STATUS_OPTIONS,
   TASK_PRIORITY_OPTIONS,
@@ -741,15 +741,7 @@ export default function TaskDetailPanel({
                 </ul>
               </div>
 
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                  <MessageSquare className="h-4 w-4" />
-                  Bình luận
-                </div>
-                <p className="mt-1 text-xs text-slate-400">
-                  Tính năng bình luận real-time sẽ có ở Giai đoạn 3.
-                </p>
-              </div>
+              <TaskComments taskId={task.id} showToast={showToast} canComment={!!user} />
 
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
