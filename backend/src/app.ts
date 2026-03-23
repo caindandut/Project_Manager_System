@@ -11,7 +11,7 @@ import taskRoutes from './routes/taskRoutes';
 import commentRoutes from './routes/commentRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import chatRoutes from './routes/chatRoutes';
-import documentRoutes from './routes/documentRoutes';
+import { projectDocumentRouter, flatDocumentRouter } from './routes/documentRoutes';
 import { notFound, errorHandler } from './middlewares/errorMiddleware';
 import { initSocket } from './socket/socketServer';
 
@@ -40,12 +40,13 @@ app.use('/api/company', companyRoutes);
  * Công việc của tôi: GET /api/users/me/tasks (app.use('/api/users', userRoutes) — getMyTasks).
  */
 app.use('/api/projects', nestedTaskGroupRouter);
+app.use('/api/projects', projectDocumentRouter);
 app.use('/api/projects', projectRoutes);
 app.use('/api/task-groups', flatTaskGroupRouter);
 app.use('/api', commentRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api', documentRoutes);
+app.use('/api', flatDocumentRouter);
 app.use('/api', taskRoutes);
 
 app.get('/', (_req: Request, res: Response): void => {
@@ -63,3 +64,11 @@ initSocket(server);
 server.listen(PORT, (): void => {
     console.log(`Server đang chạy tại: http://localhost:${PORT}`);
 });
+
+function gracefulShutdown(signal: string) {
+  console.log(`\n${signal} received — shutting down...`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 3000);
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

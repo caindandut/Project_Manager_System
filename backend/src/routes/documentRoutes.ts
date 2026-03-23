@@ -17,32 +17,34 @@ import {
   uploadFileSchema,
 } from '../validators/documentValidator';
 
-const router: Router = express.Router();
+/**
+ * projectDocumentRouter — mount tại /api/projects
+ *   /:id/documents/folder    POST
+ *   /:id/documents/upload    POST
+ *   /:id/documents/link      POST
+ *   /:id/documents           GET
+ */
+export const projectDocumentRouter: Router = express.Router();
+projectDocumentRouter.use(protect);
 
-router.use(protect);
-
-// POST /api/projects/:id/documents/folder
-router.post('/projects/:id/documents/folder', validate(createFolderSchema), createFolder);
-
-// POST /api/projects/:id/documents/upload
-router.post(
-  '/projects/:id/documents/upload',
+projectDocumentRouter.post('/:id/documents/folder', validate(createFolderSchema), createFolder);
+projectDocumentRouter.post(
+  '/:id/documents/upload',
   uploadDocumentSingle,
   validate(uploadFileSchema),
   uploadFile,
 );
+projectDocumentRouter.post('/:id/documents/link', validate(linkExternalDocumentSchema), linkExternalDocument);
+projectDocumentRouter.get('/:id/documents', validate(documentsQuerySchema, 'query'), listDocuments);
 
-// POST /api/projects/:id/documents/link
-router.post('/projects/:id/documents/link', validate(linkExternalDocumentSchema), linkExternalDocument);
+/**
+ * flatDocumentRouter — mount tại /api
+ *   /documents/:id/download  GET
+ *   /documents/:id           DELETE
+ */
+export const flatDocumentRouter: Router = express.Router();
+flatDocumentRouter.use(protect);
 
-// GET /api/projects/:id/documents?parentId=
-router.get('/projects/:id/documents', validate(documentsQuerySchema, 'query'), listDocuments);
-
-// GET /api/documents/:id/download
-router.get('/documents/:id/download', downloadDocument);
-
-// DELETE /api/documents/:id
-router.delete('/documents/:id', deleteDocument);
-
-export default router;
+flatDocumentRouter.get('/documents/:id/download', downloadDocument);
+flatDocumentRouter.delete('/documents/:id', deleteDocument);
 
