@@ -8,6 +8,8 @@ import companyRoutes from './routes/companyRoutes';
 import projectRoutes from './routes/projectRoutes';
 import { nestedTaskGroupRouter, flatTaskGroupRouter } from './routes/taskGroupRoutes';
 import taskRoutes from './routes/taskRoutes';
+import commentRoutes from './routes/commentRoutes';
+import notificationRoutes from './routes/notificationRoutes';
 import { notFound, errorHandler } from './middlewares/errorMiddleware';
 import { initSocket } from './socket/socketServer';
 
@@ -38,6 +40,8 @@ app.use('/api/company', companyRoutes);
 app.use('/api/projects', nestedTaskGroupRouter);
 app.use('/api/projects', projectRoutes);
 app.use('/api/task-groups', flatTaskGroupRouter);
+app.use('/api', commentRoutes);
+app.use('/api', notificationRoutes);
 app.use('/api', taskRoutes);
 
 app.get('/', (_req: Request, res: Response): void => {
