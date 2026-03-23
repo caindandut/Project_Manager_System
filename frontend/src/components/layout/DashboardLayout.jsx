@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useSocketContext } from "@/context/SocketContext";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -62,7 +63,7 @@ const BRAND = {
 
 const AVATAR_BG = "bg-blue-500";
 
-function UserAvatar({ name, size = "h-9 w-9 text-sm" }) {
+function UserAvatar({ name, size = "h-9 w-9 text-sm", isOnline = false }) {
   const initials = (name || "U")
     .split(" ")
     .map((w) => w[0])
@@ -70,8 +71,16 @@ function UserAvatar({ name, size = "h-9 w-9 text-sm" }) {
     .slice(0, 2)
     .toUpperCase();
   return (
-    <div className={`${AVATAR_BG} ${size} inline-flex items-center justify-center rounded-full text-white font-semibold`}>
-      {initials}
+    <div className="relative inline-flex">
+      <div className={`${AVATAR_BG} ${size} inline-flex items-center justify-center rounded-full text-white font-semibold`}>
+        {initials}
+      </div>
+      <span
+        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-slate-900 ${
+          isOnline ? "bg-emerald-400" : "bg-slate-500"
+        }`}
+        title={isOnline ? "Đang trực tuyến" : "Ngoại tuyến"}
+      />
     </div>
   );
 }
@@ -125,6 +134,7 @@ function NavItem({ icon: Icon, label, href, badge, active, disabled, onNavigate 
 
 export default function DashboardLayout({ children }) {
   const { user, logout } = useAuth();
+  const { connected } = useSocketContext();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -200,7 +210,7 @@ export default function DashboardLayout({ children }) {
 
         <div className="border-t border-white/10 px-3 py-3">
           <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-            <UserAvatar name={fullName} size="h-10 w-10 text-sm" />
+            <UserAvatar name={fullName} size="h-10 w-10 text-sm" isOnline={connected} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{fullName}</p>
               <p className="truncate text-xs text-slate-400">{email}</p>
