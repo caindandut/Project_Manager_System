@@ -284,13 +284,15 @@ export class ChatService {
     return msg;
   }
 
-  async getMessages(groupId: number, params: PaginationInput) {
+  async getMessages(groupId: number, userId: number, params: PaginationInput) {
     const { page, limit, skip } = normalizePagination(params);
-    const group = await prisma.chatgroup.findUnique({
-      where: { id: groupId },
-      select: { id: true },
+    const membership = await prisma.chatgroupmember.findUnique({
+      where: { chat_group_id_user_id: { chat_group_id: groupId, user_id: userId } },
+      select: { chat_group_id: true },
     });
-    if (!group) throw new NotFoundError('Không tìm thấy nhóm chat');
+    if (!membership) {
+      throw new ForbiddenError('Bạn không thuộc nhóm chat này');
+    }
 
     const [total, items] = await Promise.all([
       prisma.message.count({ where: { chat_group_id: groupId } }),
