@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   FolderKanban,
   ClipboardList,
+  MessageSquare,
   Users,
   UserCircle,
   Settings,
@@ -25,6 +26,7 @@ const NAV_BY_ROLE = {
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
+      { label: "Tin nhắn", icon: MessageSquare, href: "/chat" },
       { label: "Thành viên", icon: Users, href: "/members" },
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
     ],
@@ -37,6 +39,7 @@ const NAV_BY_ROLE = {
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
+      { label: "Tin nhắn", icon: MessageSquare, href: "/chat" },
       { label: "Thành viên", icon: Users, href: "/members" },
     ],
     system: [
@@ -48,6 +51,7 @@ const NAV_BY_ROLE = {
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
+      { label: "Tin nhắn", icon: MessageSquare, href: "/chat" },
     ],
     system: [
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },

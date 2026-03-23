@@ -15,6 +15,7 @@ import AcceptInvitePage from '@/pages/AcceptInvitePage';
 import ProjectsPage from '@/pages/ProjectsPage';
 import ProjectDetailPage from '@/pages/ProjectDetailPage';
 import MyTasksPage from '@/pages/MyTasksPage';
+import ChatPage from '@/pages/ChatPage';
 
 /** Các vai trò được xem trang công việc được giao (GĐ2 mục 2.12). */
 const MY_TASKS_ROLES = ['Admin', 'Director', 'Employee'];
@@ -90,6 +91,24 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={MY_TASKS_ROLES}>
                   <MyTasksPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/chat"
+              element={
+                <ProtectedRoute>
+                  <ChatPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/chat/:groupId"
+              element={
+                <ProtectedRoute>
+                  <ChatPage />
                 </ProtectedRoute>
               }
             />
