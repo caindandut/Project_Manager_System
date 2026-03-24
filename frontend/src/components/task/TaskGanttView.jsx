@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { addDays } from "date-fns";
+import { addDays, endOfDay, startOfDay } from "date-fns";
 import { Loader2 } from "lucide-react";
 import {
   GanttProvider,
@@ -29,14 +29,15 @@ function getStatusLabel(value) {
 
 function mapTaskToFeature(task) {
   const status = task.status || "Todo";
-  const startAt = task.created_at ? new Date(task.created_at) : new Date();
-  const endAt = task.deadline ? new Date(task.deadline) : addDays(startAt, 7);
+  // Normalize to day boundaries so visual duration matches sidebar duration.
+  const startAt = startOfDay(task.created_at ? new Date(task.created_at) : new Date());
+  const endAtRaw = task.deadline ? endOfDay(new Date(task.deadline)) : endOfDay(addDays(startAt, 7));
 
   return {
     id: String(task.id),
     name: task.title,
     startAt,
-    endAt: endAt > startAt ? endAt : addDays(startAt, 1),
+    endAt: endAtRaw > startAt ? endAtRaw : endOfDay(addDays(startAt, 1)),
     status: {
       id: status,
       name: getStatusLabel(status),
@@ -80,7 +81,7 @@ export default function TaskGanttView({ groups, groupsLoading }) {
 
   return (
     <div className="h-[500px] overflow-hidden rounded-lg border border-slate-200">
-      <GanttProvider className="h-full" range="monthly" zoom={100}>
+      <GanttProvider className="h-full" range="daily" zoom={100}>
         <GanttSidebar>
           {featuresByGroup.map((group) => (
             <GanttSidebarGroup key={group.groupName} name={group.groupName}>
