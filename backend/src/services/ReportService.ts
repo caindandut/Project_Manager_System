@@ -409,6 +409,14 @@ export class ReportService {
         },
       }),
     ]);
+    const taskRows = await prisma.task.findMany({
+      where: {
+        taskgroup: { project: companyId ? { company_id: companyId } : {} },
+        is_archived: false,
+      },
+      select: { status: true },
+    });
+    const taskDistribution = this.countBy(taskRows, (t) => t.status ?? 'Todo');
 
     const recentActivity = await prisma.activitylog.findMany({
       where: companyId
@@ -436,6 +444,7 @@ export class ReportService {
       overdueTasks,
       completedTasksThisWeek,
       newProjectsThisMonth,
+      taskDistribution,
       recentActivity,
     };
   }
@@ -555,7 +564,7 @@ export class ReportService {
 
     const allMyTasks = await prisma.task.findMany({
       where: { ...baseFilter },
-      select: { completion_percent: true },
+      select: { completion_percent: true, status: true, updated_at: true },
     });
     const myProgress =
       allMyTasks.length > 0
@@ -566,6 +575,15 @@ export class ReportService {
             ) / allMyTasks.length,
           )
         : 0;
+    const weekMap = new Map<string, number>();
+    for (const t of allMyTasks) {
+      if (t.status !== 'Completed' || !t.updated_at) continue;
+      const week = this.toWeekKey(t.updated_at);
+      weekMap.set(week, (weekMap.get(week) ?? 0) + 1);
+    }
+    const weeklyCompletion = Array.from(weekMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([week, completed]) => ({ week, completed }));
 
     return {
       myTasksToday,
@@ -573,6 +591,7 @@ export class ReportService {
       upcomingDeadlines,
       myOverdueTasks,
       myProgress,
+      weeklyCompletion,
     };
   }
 
