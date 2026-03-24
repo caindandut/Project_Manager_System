@@ -12,6 +12,7 @@ import commentRoutes from './routes/commentRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import chatRoutes from './routes/chatRoutes';
 import { projectDocumentRouter, flatDocumentRouter } from './routes/documentRoutes';
+import reportRoutes from './routes/reportRoutes';
 import { notFound, errorHandler } from './middlewares/errorMiddleware';
 import { initSocket } from './socket/socketServer';
 
@@ -47,6 +48,7 @@ app.use('/api', commentRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api', flatDocumentRouter);
+app.use('/api/reports', reportRoutes);
 app.use('/api', taskRoutes);
 
 app.get('/', (_req: Request, res: Response): void => {
