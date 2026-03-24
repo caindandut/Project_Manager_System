@@ -26,6 +26,13 @@ import TaskDetailPanel from "@/components/task/TaskDetailPanel";
 
 const KANBAN_STATUSES = ["Todo", "InProgress", "Review", "Completed"];
 
+function getColumnFromDropId(rawId) {
+  const id = String(rawId || "");
+  if (id.startsWith("col-")) return id.slice(4);
+  if (id.startsWith("ui-col-")) return id.slice(7);
+  return null;
+}
+
 /** Gộp Overdue vào cột Chưa làm (theo UI 4 cột). */
 function statusToColumn(status) {
   const s = status || "Todo";
@@ -357,8 +364,9 @@ export default function KanbanView({
 
     const overStr = String(over.id);
     let targetColumn;
-    if (overStr.startsWith("col-")) {
-      targetColumn = overStr.slice(4);
+    const directColumn = getColumnFromDropId(overStr);
+    if (directColumn) {
+      targetColumn = directColumn;
     } else {
       const overTask = findTaskInColumns(columns, over.id);
       if (!overTask) return;
@@ -374,7 +382,7 @@ export default function KanbanView({
       const oldIndex = list.findIndex((t) => t.id === active.id);
       if (oldIndex < 0) return;
       let newIndex;
-      if (overStr.startsWith("col-")) {
+      if (getColumnFromDropId(overStr)) {
         newIndex = Math.max(0, list.length - 1);
       } else {
         newIndex = list.findIndex((t) => t.id === over.id);
