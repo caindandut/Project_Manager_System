@@ -6,7 +6,6 @@ import {
   useSensor,
   useSensors,
   closestCorners,
-  useDroppable,
   defaultDropAnimationSideEffects,
 } from "@dnd-kit/core";
 import {
@@ -26,14 +25,6 @@ import TaskDetailPanel from "@/components/task/TaskDetailPanel";
 
 const KANBAN_STATUSES = ["Todo", "InProgress", "Review", "Completed"];
 
-function getColumnFromDropId(rawId) {
-  const id = String(rawId || "");
-  if (id.startsWith("col-")) return id.slice(4);
-  if (id.startsWith("ui-col-")) return id.slice(7);
-  return null;
-}
-
-/** Gộp Overdue vào cột Chưa làm (theo UI 4 cột). */
 function statusToColumn(status) {
   const s = status || "Todo";
   if (s === "Overdue") return "Todo";
@@ -104,7 +95,6 @@ const dropAnimation = {
   }),
 };
 
-/** Chuỗi updateStatus sau khi tạo task (mặc định Todo) để đạt cột đích. */
 const STATUS_STEPS_AFTER_CREATE = {
   Todo: [],
   InProgress: ["InProgress"],
@@ -130,7 +120,7 @@ function MiniAvatars({ assignees, max = 2 }) {
   );
 }
 
-function SortableKanbanCard({ task, canEdit, onCardClick, disabledDrag }) {
+function TaskCard({ task, onCardClick }) {
   const pri = TASK_PRIORITY_OPTIONS.find((p) => p.value === task.priority);
   const stripe =
     pri?.value === "Urgent"
@@ -148,9 +138,11 @@ function SortableKanbanCard({ task, canEdit, onCardClick, disabledDrag }) {
       <span className={`w-1 shrink-0 self-stretch ${stripe}`} aria-hidden />
       <button
         type="button"
-        onClick={() => onCardClick(task)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onCardClick(task);
+        }}
         className="min-w-0 flex-1 px-2.5 py-2 text-left hover:bg-slate-50/80"
-        disabled={disabledDrag && !canEdit}
       >
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 text-sm font-medium text-slate-800">{task.title}</span>
@@ -192,39 +184,27 @@ function KanbanColumn({
   setAddValue,
   onAdd,
   onCardClick,
-  savingDrag,
-  dragDisabled,
 }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `col-${status}`,
-    data: { type: "column", status },
-  });
-
   const ids = useMemo(() => tasks.map((t) => t.id), [tasks]);
 
   return (
-    <KanbanBoard id={`ui-col-${status}`} className="flex w-[min(100%,280px)] shrink-0 flex-col rounded-xl border border-slate-200 bg-slate-50/50">
+    <KanbanBoard id={`col-${status}`} className="flex w-[min(100%,280px)] shrink-0 flex-col rounded-xl border border-slate-200 bg-slate-50/50">
       <KanbanHeader className="border-b border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800">
         <h3 className="text-sm font-semibold text-slate-800">
           {columnLabel(status)}{" "}
           <span className="font-normal text-slate-500">({tasks.length})</span>
         </h3>
       </KanbanHeader>
-      <div
-        ref={setNodeRef}
-        className={`flex min-h-[120px] flex-1 flex-col gap-2 p-2 ${isOver ? "bg-blue-50/50 ring-1 ring-inset ring-blue-200" : ""}`}
-      >
+      <div className="flex min-h-[120px] flex-1 flex-col gap-2 p-2">
         <SortableContext id={`sort-${status}`} items={ids} strategy={verticalListSortingStrategy}>
           {tasks.length === 0 && (
             <p className="py-6 text-center text-xs text-slate-400">Không có task</p>
           )}
           {tasks.map((t) => (
-            <SortableKanbanCard
+            <TaskCard
               key={t.id}
               task={t}
-              canEdit={canEdit}
               onCardClick={onCardClick}
-              disabledDrag={savingDrag || dragDisabled}
             />
           ))}
         </SortableContext>
@@ -258,12 +238,8 @@ function KanbanColumn({
   );
 }
 
-/**
- * GĐ2 mục 2.8 — Kanban 4 cột theo trạng thái, kéo thả → updateStatus.
- */
 export default function KanbanView({
   projectId,
-  /** Nhóm đã lọc — chỉ task gốc đưa vào cột */
   groups = [],
   groupsFull,
   groupsLoading = false,
@@ -351,22 +327,22 @@ export default function KanbanView({
   };
 
   const handleDragStart = ({ active }) => {
-    const t = active.data.current?.task;
-    if (t) setActiveTask(t);
+    const task = findTaskInColumns(columns, active.id);
+    if (task) setActiveTask(task);
   };
 
   const handleDragEnd = async ({ active, over }) => {
     setActiveTask(null);
     if (!over || savingDrag || !canEditTasks || dragDisabled) return;
 
-    const activeTaskRef = active.data.current?.task;
+    const activeTaskRef = findTaskInColumns(columns, active.id);
     if (!activeTaskRef) return;
 
     const overStr = String(over.id);
     let targetColumn;
-    const directColumn = getColumnFromDropId(overStr);
-    if (directColumn) {
-      targetColumn = directColumn;
+
+    if (overStr.startsWith("col-")) {
+      targetColumn = overStr.slice(4);
     } else {
       const overTask = findTaskInColumns(columns, over.id);
       if (!overTask) return;
@@ -382,7 +358,7 @@ export default function KanbanView({
       const oldIndex = list.findIndex((t) => t.id === active.id);
       if (oldIndex < 0) return;
       let newIndex;
-      if (getColumnFromDropId(overStr)) {
+      if (overStr.startsWith("col-")) {
         newIndex = Math.max(0, list.length - 1);
       } else {
         newIndex = list.findIndex((t) => t.id === over.id);
@@ -446,8 +422,6 @@ export default function KanbanView({
               setAddValue={setAddValue}
               onAdd={handleAdd}
               onCardClick={openDetail}
-              savingDrag={savingDrag}
-              dragDisabled={dragDisabled}
             />
           ))}
         </div>
