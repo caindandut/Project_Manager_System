@@ -293,6 +293,7 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh, openT
           showToast={showToast}
           canEditTasks={canEditTasks}
           canManageProject={canManage}
+          userId={user?.id}
           onTaskUpdated={onProjectRefresh}
           openTaskId={openTaskId}
           onDismissOpenTask={onDismissUrlTask}
@@ -309,6 +310,7 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh, openT
           showToast={showToast}
           canEditTasks={canEditTasks}
           canManageProject={canManage}
+          userId={user?.id}
           onTaskUpdated={onProjectRefresh}
           openTaskId={openTaskId}
           onDismissOpenTask={onDismissUrlTask}
@@ -719,7 +721,7 @@ export default function ProjectDetailPage() {
   const [toast, setToast] = useState(null);
 
   const isManager = project?.members?.some((m) => m.id === user?.id && m.project_role === "Manager");
-  const canManage = user?.role === "Admin" || isManager;
+  const canManage = user?.role === "Admin" || user?.role === "Director" || isManager;
 
   const dismissTaskFromUrl = useCallback(() => {
     const p = new URLSearchParams(searchParams);

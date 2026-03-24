@@ -74,3 +74,28 @@ export const ASSIGNEE_ROLE_OPTIONS = [
   { value: "Main", label: "Chính" },
   { value: "Support", label: "Hỗ trợ" },
 ];
+
+/**
+ * Bảng chuyển trạng thái hợp lệ — đồng bộ backend `ALLOWED_TRANSITIONS`.
+ */
+export const ALLOWED_TRANSITIONS = {
+  Todo: ["InProgress"],
+  InProgress: ["Review", "Todo"],
+  Review: ["Completed", "InProgress"],
+  Completed: [],
+  Overdue: ["InProgress", "Review"],
+};
+
+/**
+ * Trả về danh sách trạng thái tiếp theo mà user được phép chọn.
+ * - `canApproveReview = true` khi user là Admin / Director / Manager dự án / người tạo task.
+ *   Chỉ những người này mới được duyệt (Review→Completed) hoặc từ chối (Review→InProgress).
+ * - Member thường khi task đang Review sẽ nhận mảng rỗng → dropdown bị khoá.
+ */
+export function getNextStatuses(currentStatus, canApproveReview = false) {
+  const transitions = ALLOWED_TRANSITIONS[currentStatus] || [];
+  if (currentStatus === "Review" && !canApproveReview) {
+    return [];
+  }
+  return transitions;
+}

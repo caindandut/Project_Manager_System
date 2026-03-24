@@ -41,6 +41,7 @@ import {
   TASK_PRIORITY_OPTIONS,
   TASK_LABEL_PRESETS,
   ASSIGNEE_ROLE_OPTIONS,
+  getNextStatuses,
 } from "@/constants/taskUi";
 
 const AVATAR_BG = [
@@ -171,6 +172,24 @@ export default function TaskDetailPanel({
     if (task.creator_id === user.id) return true;
     return task.assignees?.some((a) => a.user_id === user.id);
   }, [task, user]);
+
+  const canApproveReview = useMemo(
+    () => canManageProject || (task && user && task.creator_id === user.id),
+    [canManageProject, task, user],
+  );
+
+  const statusOptions = useMemo(() => {
+    if (!task) return TASK_STATUS_OPTIONS;
+    const next = getNextStatuses(task.status, canApproveReview);
+    return TASK_STATUS_OPTIONS.filter(
+      (o) => o.value === task.status || next.includes(o.value),
+    );
+  }, [task, canApproveReview]);
+
+  const statusLocked = useMemo(() => {
+    if (!canEditTasks || !task) return true;
+    return getNextStatuses(task.status, canApproveReview).length === 0;
+  }, [canEditTasks, task, canApproveReview]);
 
   const openAssignDialog = async () => {
     if (!task?.project_id) return;
@@ -486,20 +505,25 @@ export default function TaskDetailPanel({
               <div className="flex flex-wrap gap-2">
                 <Select
                   value={task.status || "Todo"}
-                  disabled={!canEditTasks}
+                  disabled={statusLocked}
                   onValueChange={handleStatus}
                 >
                   <SelectTrigger className="h-9 w-[140px] text-xs">
                     <SelectValue placeholder="Trạng thái" />
                   </SelectTrigger>
                   <SelectContent>
-                    {TASK_STATUS_OPTIONS.map((o) => (
+                    {statusOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         {o.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {task.status === "Review" && !canApproveReview && (
+                  <p className="w-full text-[11px] text-amber-600">
+                    Đang chờ Manager / người tạo task duyệt hoặc từ chối.
+                  </p>
+                )}
                 <Select
                   value={task.priority || "Medium"}
                   disabled={!canEditTasks}
@@ -653,30 +677,36 @@ export default function TaskDetailPanel({
                     </Label>
                   </div>
                   <div className="space-y-2">
-                    {(task.subtasks || []).map((s) => (
-                      <div
-                        key={s.id}
-                        className="flex items-center gap-2 rounded-md border border-slate-100 bg-slate-50/50 px-2 py-1.5"
-                      >
-                        <Select
-                          value={s.status || "Todo"}
-                          disabled={!canEditTasks}
-                          onValueChange={(v) => handleSubtaskStatus(s.id, v)}
+                    {(task.subtasks || []).map((s) => {
+                      const subNext = getNextStatuses(s.status, canApproveReview);
+                      const subOpts = TASK_STATUS_OPTIONS.filter(
+                        (o) => o.value === s.status || subNext.includes(o.value),
+                      );
+                      return (
+                        <div
+                          key={s.id}
+                          className="flex items-center gap-2 rounded-md border border-slate-100 bg-slate-50/50 px-2 py-1.5"
                         >
-                          <SelectTrigger className="h-8 w-[120px] text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TASK_STATUS_OPTIONS.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <span className="flex-1 text-sm text-slate-800">{s.title}</span>
-                      </div>
-                    ))}
+                          <Select
+                            value={s.status || "Todo"}
+                            disabled={!canEditTasks || subNext.length === 0}
+                            onValueChange={(v) => handleSubtaskStatus(s.id, v)}
+                          >
+                            <SelectTrigger className="h-8 w-[120px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {subOpts.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="flex-1 text-sm text-slate-800">{s.title}</span>
+                        </div>
+                      );
+                    })}
                     {canEditTasks && (
                       <div className="flex gap-2 pt-1">
                         <Input

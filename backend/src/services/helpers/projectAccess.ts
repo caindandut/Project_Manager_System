@@ -87,7 +87,7 @@ export async function assertManagerOrAdminOnProject(
     throw new NotFoundError('Không tìm thấy người dùng');
   }
 
-  if (requester.role === 'Admin') {
+  if (requester.role === 'Admin' || requester.role === 'Director') {
     if (project.company_id == null || project.company_id !== requester.company_id) {
       throw new ForbiddenError('Bạn không có quyền truy cập dự án này');
     }

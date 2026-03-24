@@ -61,6 +61,7 @@ import taskApi from "@/api/taskApi";
 import {
   TASK_STATUS_OPTIONS,
   TASK_PRIORITY_OPTIONS,
+  getNextStatuses,
 } from "@/constants/taskUi";
 
 const AVATAR_BG = [
@@ -126,6 +127,7 @@ function SortableTaskRow({
   task,
   groupId,
   canEditTasks,
+  canApproveReview,
   onTitleClick,
   onStatusChange,
   onCompleteClick,
@@ -152,7 +154,13 @@ function SortableTaskRow({
 
   const pri = TASK_PRIORITY_OPTIONS.find((p) => p.value === task.priority);
   const isCompleted = task.status === "Completed";
-  const canMarkDone = canEditTasks && task.status === "Review";
+  const canMarkDone = canEditTasks && task.status === "Review" && canApproveReview;
+
+  const nextStatuses = getNextStatuses(task.status, canApproveReview);
+  const visibleStatuses = TASK_STATUS_OPTIONS.filter(
+    (o) => o.value === task.status || nextStatuses.includes(o.value),
+  );
+  const statusLocked = !canEditTasks || nextStatuses.length === 0;
 
   return (
     <div
@@ -174,13 +182,15 @@ function SortableTaskRow({
       <input
         type="checkbox"
         checked={isCompleted}
-        disabled={!canEditTasks || isCompleted || (!canMarkDone && !isCompleted)}
+        disabled={!canMarkDone || isCompleted}
         title={
           isCompleted
             ? "Đã hoàn thành"
             : canMarkDone
-              ? "Đánh dấu hoàn thành"
-              : "Chỉ đánh dấu khi task ở trạng thái Chờ xác nhận"
+              ? "Duyệt hoàn thành"
+              : task.status === "Review"
+                ? "Chỉ Manager/người tạo mới duyệt hoàn thành"
+                : "Chỉ đánh dấu khi task ở trạng thái Chờ xác nhận"
         }
         onChange={() => canMarkDone && onCompleteClick(task)}
         className="h-4 w-4 shrink-0 rounded border-slate-300"
@@ -216,14 +226,14 @@ function SortableTaskRow({
       <div className="w-[130px] shrink-0" onPointerDown={(e) => e.stopPropagation()}>
         <Select
           value={task.status || "Todo"}
-          disabled={!canEditTasks}
+          disabled={statusLocked}
           onValueChange={(v) => onStatusChange(task, v)}
         >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {TASK_STATUS_OPTIONS.map((o) => (
+            {visibleStatuses.map((o) => (
               <SelectItem key={o.value} value={o.value}>
                 {o.label}
               </SelectItem>
@@ -241,6 +251,7 @@ function GroupTaskList({
   onToggle,
   canEditTasks,
   canManageGroups,
+  canApproveReview,
   savingDrag,
   dragDisabled,
   quickTitle,
@@ -324,6 +335,7 @@ function GroupTaskList({
                   task={task}
                   groupId={group.id}
                   canEditTasks={canEditTasks}
+                  canApproveReview={canApproveReview(task)}
                   disabledDrag={savingDrag || dragDisabled}
                   onTitleClick={onTitleClick}
                   onStatusChange={onStatusChange}
@@ -385,6 +397,7 @@ export default function TaskListView({
   showToast,
   canEditTasks = false,
   canManageProject = false,
+  userId,
   onTaskUpdated,
   /** Mở TaskDetailPanel từ URL (?task=) */
   openTaskId = null,
@@ -560,6 +573,11 @@ export default function TaskListView({
     }
   };
 
+  const checkCanApproveReview = useCallback(
+    (task) => canManageProject || task.creator_id === userId,
+    [canManageProject, userId],
+  );
+
   const openDetail = (task) => {
     setSelectedTaskId(task.id);
   };
@@ -667,6 +685,7 @@ export default function TaskListView({
             onToggle={() => toggleGroup(g.id)}
             canEditTasks={canEditTasks}
             canManageGroups={canEditTasks}
+            canApproveReview={checkCanApproveReview}
             savingDrag={savingDrag}
             dragDisabled={dragDisabled}
             quickTitle={quickTitle}

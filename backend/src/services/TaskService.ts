@@ -327,6 +327,10 @@ export class TaskService {
       await this.assertCanCompleteFromReview(task.project_id, task.creator_id, actorId);
     }
 
+    if (current === TaskStatus.REVIEW && next === TaskStatus.IN_PROGRESS) {
+      await this.assertCanRejectFromReview(task.project_id, task.creator_id, actorId);
+    }
+
     const updateData: any = {
       status: newStatus,
       updated_at: new Date(),
@@ -1022,6 +1026,19 @@ export class TaskService {
       projectId,
       actorId,
       'Chỉ Admin, Manager dự án hoặc người tạo task mới duyệt hoàn thành từ trạng thái Chờ xác nhận',
+    );
+  }
+
+  private async assertCanRejectFromReview(
+    projectId: number,
+    creatorId: number | null,
+    actorId: number,
+  ): Promise<void> {
+    if (creatorId === actorId) return;
+    await assertManagerOrAdminOnProject(
+      projectId,
+      actorId,
+      'Chỉ Admin, Director, Manager dự án hoặc người tạo task mới từ chối (đưa về Đang làm) từ trạng thái Chờ xác nhận',
     );
   }
 
