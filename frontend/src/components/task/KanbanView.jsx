@@ -18,6 +18,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -25,7 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Calendar, CheckCircle2 } from "lucide-react";
+import { Loader2, Plus, Calendar, CheckCircle2, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import taskGroupApi from "@/api/taskGroupApi";
 import taskApi from "@/api/taskApi";
 import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants/taskUi";
@@ -93,13 +99,6 @@ const dropAnimation = {
   sideEffects: defaultDropAnimationSideEffects({
     styles: { active: { opacity: "0.5" } },
   }),
-};
-
-const STATUS_STEPS_AFTER_CREATE = {
-  Todo: [],
-  InProgress: ["InProgress"],
-  Review: ["InProgress", "Review"],
-  Completed: ["InProgress", "Review", "Completed"],
 };
 
 function MiniAvatars({ assignees, max = 2 }) {
@@ -183,9 +182,12 @@ function KanbanColumn({
   group,
   tasks,
   canEdit,
+  canManageGroups,
   addValue,
   setAddValue,
   onAdd,
+  onEditGroup,
+  onDeleteGroup,
   onCardClick,
 }) {
   const ids = useMemo(() => tasks.map((t) => taskDndId(t.id)), [tasks]);
@@ -193,10 +195,34 @@ function KanbanColumn({
   return (
     <KanbanBoard id={colDndId(group.id)} className="flex w-[min(100%,280px)] shrink-0 flex-col rounded-xl border border-slate-200 bg-slate-50/50">
       <KanbanHeader className="border-b border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800">
-        <h3 className="text-sm font-semibold text-slate-800">
-          {group.group_name}{" "}
-          <span className="font-normal text-slate-500">({tasks.length})</span>
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-slate-800">
+            {group.group_name}{" "}
+            <span className="font-normal text-slate-500">({tasks.length})</span>
+          </h3>
+          {canManageGroups && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => onEditGroup(group)}>
+                  <Pencil className="h-4 w-4" />
+                  Đổi tên cột
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onDeleteGroup(group)}
+                  className="text-red-600 focus:bg-red-50 focus:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Xóa cột
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </KanbanHeader>
       <div className="flex min-h-[120px] flex-1 flex-col gap-2 p-2">
         <SortableContext id={`sort-${group.id}`} items={ids} strategy={verticalListSortingStrategy}>
@@ -258,6 +284,12 @@ export default function KanbanView({
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupLoading, setNewGroupLoading] = useState(false);
+  const [editGroupOpen, setEditGroupOpen] = useState(false);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupLoading, setEditGroupLoading] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [deleteGroupTarget, setDeleteGroupTarget] = useState(null);
+  const [deleteGroupLoading, setDeleteGroupLoading] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [savingDrag, setSavingDrag] = useState(false);
   const [addValue, setAddValue] = useState({});
@@ -328,6 +360,48 @@ export default function KanbanView({
       showToast(err.response?.data?.message || "Không tạo được cột", "error");
     } finally {
       setNewGroupLoading(false);
+    }
+  };
+
+  const openEditGroup = (group) => {
+    setEditingGroup(group);
+    setEditGroupName(group.group_name || "");
+    setEditGroupOpen(true);
+  };
+
+  const handleEditGroup = async () => {
+    if (!editingGroup) return;
+    const nextName = editGroupName.trim();
+    if (!nextName) {
+      showToast("Tên cột không được để trống", "error");
+      return;
+    }
+    setEditGroupLoading(true);
+    try {
+      await taskGroupApi.update(editingGroup.id, { group_name: nextName });
+      showToast("Đã cập nhật tên cột");
+      setEditGroupOpen(false);
+      setEditingGroup(null);
+      await reload();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Không đổi tên được cột", "error");
+    } finally {
+      setEditGroupLoading(false);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!deleteGroupTarget) return;
+    setDeleteGroupLoading(true);
+    try {
+      await taskGroupApi.remove(deleteGroupTarget.id);
+      showToast("Đã xóa cột");
+      setDeleteGroupTarget(null);
+      await reload();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Không xóa được cột", "error");
+    } finally {
+      setDeleteGroupLoading(false);
     }
   };
 
@@ -447,9 +521,12 @@ export default function KanbanView({
               group={group}
               tasks={group.tasks || []}
               canEdit={canEditTasks}
+              canManageGroups={canEditTasks}
               addValue={addValue}
               setAddValue={setAddValue}
               onAdd={handleAdd}
+              onEditGroup={openEditGroup}
+              onDeleteGroup={setDeleteGroupTarget}
               onCardClick={openDetail}
             />
           ))}
@@ -489,6 +566,67 @@ export default function KanbanView({
             >
               {newGroupLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Tạo cột
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editGroupOpen}
+        onOpenChange={(v) => {
+          setEditGroupOpen(v);
+          if (!v) setEditingGroup(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Đổi tên cột</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="kanban-edit-col-name">Tên cột mới</Label>
+            <Input
+              id="kanban-edit-col-name"
+              value={editGroupName}
+              onChange={(e) => setEditGroupName(e.target.value)}
+              placeholder="Ví dụ: QA Review"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditGroupOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={editGroupLoading}
+              onClick={handleEditGroup}
+            >
+              {editGroupLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteGroupTarget}
+        onOpenChange={(v) => {
+          if (!v) setDeleteGroupTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xóa cột Kanban</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600">
+            Bạn có chắc muốn xóa cột <strong>{deleteGroupTarget?.group_name}</strong>? Hành động này có thể thất bại nếu cột còn chứa task.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteGroupTarget(null)} disabled={deleteGroupLoading}>
+              Hủy
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteGroup} disabled={deleteGroupLoading}>
+              {deleteGroupLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Xóa cột
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -25,6 +25,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -45,6 +51,9 @@ import {
   Loader2,
   Plus,
   Calendar,
+  MoreVertical,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import TaskDetailPanel from "@/components/task/TaskDetailPanel";
 import taskGroupApi from "@/api/taskGroupApi";
@@ -231,11 +240,14 @@ function GroupTaskList({
   open,
   onToggle,
   canEditTasks,
+  canManageGroups,
   savingDrag,
   dragDisabled,
   quickTitle,
   setQuickTitle,
   onQuickAdd,
+  onEditGroup,
+  onDeleteGroup,
   onTitleClick,
   onStatusChange,
   onCompleteClick,
@@ -250,23 +262,43 @@ function GroupTaskList({
 
   return (
     <UiListGroup id={`group-shell-${group.id}`} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-100/80"
-      >
-        <UiListHeader className="flex w-full items-center justify-between gap-2 bg-transparent p-0">
-          <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
-            />
-            Nhóm: {group.group_name}
-          </span>
-          <span className="text-xs text-slate-500">
-            {count} công việc
-          </span>
-        </UiListHeader>
-      </button>
+      <div className="flex w-full items-center justify-between gap-2 px-4 py-3 hover:bg-slate-100/80">
+        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 text-left">
+          <UiListHeader className="flex w-full items-center justify-between gap-2 bg-transparent p-0">
+            <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
+              />
+              Nhóm: {group.group_name}
+            </span>
+            <span className="text-xs text-slate-500">
+              {count} công việc
+            </span>
+          </UiListHeader>
+        </button>
+        {canManageGroups && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => onEditGroup(group)}>
+                <Pencil className="h-4 w-4" />
+                Đổi tên nhóm
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onDeleteGroup(group)}
+                className="text-red-600 focus:bg-red-50 focus:text-red-600"
+              >
+                <Trash2 className="h-4 w-4" />
+                Xóa nhóm
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
 
       {open && (
         <UiListItems className="space-y-2 border-t border-slate-200 bg-white px-3 py-3">
@@ -365,6 +397,12 @@ export default function TaskListView({
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupLoading, setNewGroupLoading] = useState(false);
+  const [editGroupOpen, setEditGroupOpen] = useState(false);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupLoading, setEditGroupLoading] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [deleteGroupTarget, setDeleteGroupTarget] = useState(null);
+  const [deleteGroupLoading, setDeleteGroupLoading] = useState(false);
 
   const [selectedTaskId, setSelectedTaskId] = useState(null);
 
@@ -442,6 +480,48 @@ export default function TaskListView({
       showToast(err.response?.data?.message || "Không tạo được nhóm", "error");
     } finally {
       setNewGroupLoading(false);
+    }
+  };
+
+  const openEditGroup = (group) => {
+    setEditingGroup(group);
+    setEditGroupName(group.group_name || "");
+    setEditGroupOpen(true);
+  };
+
+  const handleEditGroup = async () => {
+    if (!editingGroup) return;
+    const nextName = editGroupName.trim();
+    if (!nextName) {
+      showToast("Tên nhóm không được để trống", "error");
+      return;
+    }
+    setEditGroupLoading(true);
+    try {
+      await taskGroupApi.update(editingGroup.id, { group_name: nextName });
+      showToast("Đã cập nhật tên nhóm");
+      setEditGroupOpen(false);
+      setEditingGroup(null);
+      await reload();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Không đổi tên được nhóm", "error");
+    } finally {
+      setEditGroupLoading(false);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!deleteGroupTarget) return;
+    setDeleteGroupLoading(true);
+    try {
+      await taskGroupApi.remove(deleteGroupTarget.id);
+      showToast("Đã xóa nhóm công việc");
+      setDeleteGroupTarget(null);
+      await reload();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Không xóa được nhóm", "error");
+    } finally {
+      setDeleteGroupLoading(false);
     }
   };
 
@@ -586,11 +666,14 @@ export default function TaskListView({
             open={openMap[g.id] !== false}
             onToggle={() => toggleGroup(g.id)}
             canEditTasks={canEditTasks}
+            canManageGroups={canEditTasks}
             savingDrag={savingDrag}
             dragDisabled={dragDisabled}
             quickTitle={quickTitle}
             setQuickTitle={setQuickTitle}
             onQuickAdd={handleQuickAdd}
+            onEditGroup={openEditGroup}
+            onDeleteGroup={setDeleteGroupTarget}
             onTitleClick={openDetail}
             onStatusChange={handleStatusChange}
             onCompleteClick={handleCompleteClick}
@@ -654,6 +737,67 @@ export default function TaskListView({
             >
               {newGroupLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Tạo nhóm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editGroupOpen}
+        onOpenChange={(v) => {
+          setEditGroupOpen(v);
+          if (!v) setEditingGroup(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Đổi tên nhóm công việc</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="tg-edit-name">Tên nhóm mới</Label>
+            <Input
+              id="tg-edit-name"
+              value={editGroupName}
+              onChange={(e) => setEditGroupName(e.target.value)}
+              placeholder="Ví dụ: Backend API"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditGroupOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={editGroupLoading}
+              onClick={handleEditGroup}
+            >
+              {editGroupLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteGroupTarget}
+        onOpenChange={(v) => {
+          if (!v) setDeleteGroupTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xóa nhóm công việc</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600">
+            Bạn có chắc muốn xóa nhóm <strong>{deleteGroupTarget?.group_name}</strong>? Hành động này có thể thất bại nếu nhóm còn chứa task.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteGroupTarget(null)} disabled={deleteGroupLoading}>
+              Hủy
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteGroup} disabled={deleteGroupLoading}>
+              {deleteGroupLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Xóa nhóm
             </Button>
           </DialogFooter>
         </DialogContent>
