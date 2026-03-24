@@ -49,6 +49,8 @@ import {
   Save,
   LayoutGrid,
   List,
+  GanttChart,
+  CalendarDays,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import projectApi from "@/api/projectApi";
@@ -63,6 +65,8 @@ import {
 import { TASK_LABEL_PRESETS } from "@/constants/taskUi";
 import TaskListView from "@/components/task/TaskListView";
 import KanbanView from "@/components/task/KanbanView";
+import TaskGanttView from "@/components/task/TaskGanttView";
+import TaskCalendarView from "@/components/task/TaskCalendarView";
 import TasksFilterBar from "@/components/task/TasksFilterBar";
 import {
   filterTaskGroups,
@@ -245,22 +249,22 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh, openT
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-slate-500">Chế độ xem:</span>
           <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-            <button
-              type="button"
-              onClick={() => setTaskView("list")}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === "list" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
-            >
-              <List className="h-3.5 w-3.5" />
-              Danh sách
-            </button>
-            <button
-              type="button"
-              onClick={() => setTaskView("kanban")}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === "kanban" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Kanban
-            </button>
+            {[
+              { key: "list", label: "Danh sách", icon: List },
+              { key: "kanban", label: "Kanban", icon: LayoutGrid },
+              { key: "gantt", label: "Gantt", icon: GanttChart },
+              { key: "calendar", label: "Lịch", icon: CalendarDays },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setTaskView(item.key)}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${taskView === item.key ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-800"}`}
+              >
+                <item.icon className="h-3.5 w-3.5" />
+                {item.label}
+              </button>
+            ))}
           </div>
         </div>
         {dragFiltered && (
@@ -277,7 +281,7 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh, openT
         labelOptions={labelOptions}
       />
 
-      {taskView === "list" ? (
+      {taskView === "list" && (
         <TaskListView
           projectId={project.id}
           groups={filteredGroups}
@@ -293,7 +297,8 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh, openT
           openTaskId={openTaskId}
           onDismissOpenTask={onDismissUrlTask}
         />
-      ) : (
+      )}
+      {taskView === "kanban" && (
         <KanbanView
           projectId={project.id}
           groups={filteredGroups}
@@ -307,6 +312,18 @@ function TasksTab({ project, user, showToast, canManage, onProjectRefresh, openT
           onTaskUpdated={onProjectRefresh}
           openTaskId={openTaskId}
           onDismissOpenTask={onDismissUrlTask}
+        />
+      )}
+      {taskView === "gantt" && (
+        <TaskGanttView
+          groups={filteredGroups}
+          groupsLoading={groupsLoading}
+        />
+      )}
+      {taskView === "calendar" && (
+        <TaskCalendarView
+          groups={filteredGroups}
+          groupsLoading={groupsLoading}
         />
       )}
     </div>
