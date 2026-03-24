@@ -13,6 +13,7 @@ import {
   GanttFeatureItem,
   GanttToday,
 } from "@/components/ui/gantt";
+import { TASK_STATUS_OPTIONS } from "@/constants/taskUi";
 
 const STATUS_COLOR_MAP = {
   Todo: "#6B7280",
@@ -22,7 +23,12 @@ const STATUS_COLOR_MAP = {
   Overdue: "#EF4444",
 };
 
-function mapTaskToFeature(task, groupName) {
+function getStatusLabel(value) {
+  return TASK_STATUS_OPTIONS.find((o) => o.value === value)?.label || value || "Chưa làm";
+}
+
+function mapTaskToFeature(task) {
+  const status = task.status || "Todo";
   const startAt = task.created_at ? new Date(task.created_at) : new Date();
   const endAt = task.deadline ? new Date(task.deadline) : addDays(startAt, 7);
 
@@ -32,11 +38,10 @@ function mapTaskToFeature(task, groupName) {
     startAt,
     endAt: endAt > startAt ? endAt : addDays(startAt, 1),
     status: {
-      id: task.status || "Todo",
-      name: task.status || "Todo",
-      color: STATUS_COLOR_MAP[task.status] || STATUS_COLOR_MAP.Todo,
+      id: status,
+      name: getStatusLabel(status),
+      color: STATUS_COLOR_MAP[status] || STATUS_COLOR_MAP.Todo,
     },
-    groupName,
   };
 }
 
@@ -46,8 +51,8 @@ export default function TaskGanttView({ groups, groupsLoading }) {
     return groups.map((group) => ({
       groupName: group.group_name,
       features: (group.tasks || [])
-        .filter((t) => !t.is_archived)
-        .map((t) => mapTaskToFeature(t, group.group_name)),
+        .filter((t) => !t.is_archived && t.parent_task_id == null)
+        .map((t) => mapTaskToFeature(t)),
     }));
   }, [groups]);
 
@@ -92,6 +97,10 @@ export default function TaskGanttView({ groups, groupsLoading }) {
               <GanttFeatureListGroup key={group.groupName}>
                 {group.features.map((feature) => (
                   <GanttFeatureItem key={feature.id} {...feature}>
+                    <div
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: feature.status.color }}
+                    />
                     <p className="flex-1 truncate text-xs">{feature.name}</p>
                   </GanttFeatureItem>
                 ))}
