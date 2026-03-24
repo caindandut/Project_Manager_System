@@ -71,6 +71,7 @@ import {
   countTasksInGroups,
 } from "@/utils/taskFilters";
 import DocumentExplorer from "@/components/document/DocumentExplorer";
+import BurndownChart from "@/components/chart/BurndownChart";
 
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500",
@@ -173,6 +174,8 @@ function OverviewTab({ project }) {
           )}
         </CardContent>
       </Card>
+
+      <BurndownChart projectId={project.id} />
     </div>
   );
 }
