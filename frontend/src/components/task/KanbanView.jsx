@@ -12,14 +12,13 @@ import {
 import {
   SortableContext,
   arrayMove,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { KanbanBoard, KanbanCard, KanbanHeader } from "@/components/ui/kanban";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Calendar, CheckCircle2, GripVertical } from "lucide-react";
+import { Loader2, Plus, Calendar, CheckCircle2 } from "lucide-react";
 import taskGroupApi from "@/api/taskGroupApi";
 import taskApi from "@/api/taskApi";
 import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants/taskUi";
@@ -125,25 +124,6 @@ function MiniAvatars({ assignees, max = 2 }) {
 }
 
 function SortableKanbanCard({ task, canEdit, onCardClick, disabledDrag }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: task.id,
-    data: { type: "task", task },
-    disabled: disabledDrag || !canEdit,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  };
-
   const pri = TASK_PRIORITY_OPTIONS.find((p) => p.value === task.priority);
   const stripe =
     pri?.value === "Urgent"
@@ -157,27 +137,13 @@ function SortableKanbanCard({ task, canEdit, onCardClick, disabledDrag }) {
   const done = task.status === "Completed";
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
-    >
+    <KanbanCard id={task.id} name={task.title} className="gap-0 overflow-hidden rounded-lg border border-slate-200 p-0">
       <span className={`w-1 shrink-0 self-stretch ${stripe}`} aria-hidden />
-      {canEdit && (
-        <button
-          type="button"
-          className="touch-none border-r border-slate-100 bg-slate-50/80 px-1 text-slate-400 hover:text-slate-600"
-          aria-label="Kéo thẻ"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-      )}
       <button
         type="button"
         onClick={() => onCardClick(task)}
         className="min-w-0 flex-1 px-2.5 py-2 text-left hover:bg-slate-50/80"
+        disabled={disabledDrag && !canEdit}
       >
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 text-sm font-medium text-slate-800">{task.title}</span>
@@ -207,7 +173,7 @@ function SortableKanbanCard({ task, canEdit, onCardClick, disabledDrag }) {
           <MiniAvatars assignees={task.assignees} />
         </div>
       </button>
-    </div>
+    </KanbanCard>
   );
 }
 
@@ -230,13 +196,13 @@ function KanbanColumn({
   const ids = useMemo(() => tasks.map((t) => t.id), [tasks]);
 
   return (
-    <div className="flex w-[min(100%,280px)] shrink-0 flex-col rounded-xl border border-slate-200 bg-slate-50/50">
-      <div className="border-b border-slate-200 px-3 py-2.5">
+    <KanbanBoard id={`ui-col-${status}`} className="flex w-[min(100%,280px)] shrink-0 flex-col rounded-xl border border-slate-200 bg-slate-50/50">
+      <KanbanHeader className="border-b border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800">
         <h3 className="text-sm font-semibold text-slate-800">
           {columnLabel(status)}{" "}
           <span className="font-normal text-slate-500">({tasks.length})</span>
         </h3>
-      </div>
+      </KanbanHeader>
       <div
         ref={setNodeRef}
         className={`flex min-h-[120px] flex-1 flex-col gap-2 p-2 ${isOver ? "bg-blue-50/50 ring-1 ring-inset ring-blue-200" : ""}`}
@@ -251,7 +217,7 @@ function KanbanColumn({
               task={t}
               canEdit={canEdit}
               onCardClick={onCardClick}
-              disabledDrag={savingDrag}
+              disabledDrag={savingDrag || dragDisabled}
             />
           ))}
         </SortableContext>
@@ -281,7 +247,7 @@ function KanbanColumn({
           </div>
         )}
       </div>
-    </div>
+    </KanbanBoard>
   );
 }
 
@@ -313,6 +279,12 @@ export default function KanbanView({
   const [savingDrag, setSavingDrag] = useState(false);
   const [addValue, setAddValue] = useState({});
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+
+  useEffect(() => {
+    if (openTaskId != null && Number.isFinite(openTaskId)) {
+      setSelectedTaskId(openTaskId);
+    }
+  }, [openTaskId]);
 
   const defaultGroupId = (groupsFull && groupsFull[0]?.id) || groups[0]?.id;
 

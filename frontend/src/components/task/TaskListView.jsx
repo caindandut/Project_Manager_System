@@ -16,6 +16,11 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  ListGroup as UiListGroup,
+  ListHeader as UiListHeader,
+  ListItems as UiListItems,
+} from "@/components/ui/list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -244,25 +249,27 @@ function GroupTaskList({
   const taskIds = useMemo(() => (group.tasks || []).map((t) => t.id), [group.tasks]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40">
+    <UiListGroup id={`group-shell-${group.id}`} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40">
       <button
         type="button"
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-100/80"
       >
-        <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <ChevronDown
-            className={`h-4 w-4 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
-          />
-          Nhóm: {group.group_name}
-        </span>
-        <span className="text-xs text-slate-500">
-          {count} công việc
-        </span>
+        <UiListHeader className="flex w-full items-center justify-between gap-2 bg-transparent p-0">
+          <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
+            />
+            Nhóm: {group.group_name}
+          </span>
+          <span className="text-xs text-slate-500">
+            {count} công việc
+          </span>
+        </UiListHeader>
       </button>
 
       {open && (
-        <div className="space-y-2 border-t border-slate-200 bg-white px-3 py-3">
+        <UiListItems className="space-y-2 border-t border-slate-200 bg-white px-3 py-3">
           <div
             ref={setNodeRef}
             className={`min-h-[56px] space-y-2 rounded-md p-1 transition-colors ${
@@ -322,9 +329,9 @@ function GroupTaskList({
               </Button>
             </div>
           )}
-        </div>
+        </UiListItems>
       )}
-    </div>
+    </UiListGroup>
   );
 }
 
