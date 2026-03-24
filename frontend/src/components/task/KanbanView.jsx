@@ -17,24 +17,19 @@ import { KanbanBoard, KanbanCard, KanbanHeader } from "@/components/ui/kanban";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Calendar, CheckCircle2 } from "lucide-react";
 import taskGroupApi from "@/api/taskGroupApi";
 import taskApi from "@/api/taskApi";
 import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants/taskUi";
 import TaskDetailPanel from "@/components/task/TaskDetailPanel";
-
-const KANBAN_STATUSES = ["Todo", "InProgress", "Review", "Completed"];
-
-function statusToColumn(status) {
-  const s = status || "Todo";
-  if (s === "Overdue") return "Todo";
-  if (KANBAN_STATUSES.includes(s)) return s;
-  return "Todo";
-}
-
-function columnLabel(status) {
-  return TASK_STATUS_OPTIONS.find((o) => o.value === status)?.label || status;
-}
 
 const AVATAR_BG = [
   "bg-blue-500",
@@ -61,32 +56,37 @@ function fmtDeadline(d) {
   });
 }
 
-function flattenRootTasks(groups) {
-  const out = [];
+const taskDndId = (id) => `task-${id}`;
+const colDndId = (id) => `col-${id}`;
+
+function getTaskIdFromDndId(id) {
+  const s = String(id);
+  if (!s.startsWith("task-")) return null;
+  const n = parseInt(s.slice(5), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getColumnIdFromDndId(id) {
+  const s = String(id);
+  if (!s.startsWith("col-")) return null;
+  const n = parseInt(s.slice(4), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function findGroupContainingTask(groups, taskId) {
+  return (groups || []).find((g) => (g.tasks || []).some((t) => t.id === taskId));
+}
+
+function findTaskInGroups(groups, taskId) {
   for (const g of groups || []) {
-    for (const t of g.tasks || []) {
-      if (t.parent_task_id != null) continue;
-      out.push({ ...t, _groupId: g.id });
-    }
-  }
-  return out;
-}
-
-function bucketByColumn(tasks) {
-  const cols = { Todo: [], InProgress: [], Review: [], Completed: [] };
-  for (const t of tasks) {
-    const col = statusToColumn(t.status);
-    cols[col].push(t);
-  }
-  return cols;
-}
-
-function findTaskInColumns(columns, taskId) {
-  for (const s of KANBAN_STATUSES) {
-    const t = columns[s].find((x) => x.id === taskId);
-    if (t) return t;
+    const found = (g.tasks || []).find((t) => t.id === taskId);
+    if (found) return found;
   }
   return null;
+}
+
+function statusLabel(value) {
+  return TASK_STATUS_OPTIONS.find((o) => o.value === value)?.label || value || "Chưa làm";
 }
 
 const dropAnimation = {
@@ -134,7 +134,7 @@ function TaskCard({ task, onCardClick }) {
   const done = task.status === "Completed";
 
   return (
-    <KanbanCard id={task.id} name={task.title} className="gap-0 overflow-hidden rounded-lg border border-slate-200 p-0">
+    <KanbanCard id={taskDndId(task.id)} name={task.title} className="gap-0 overflow-hidden rounded-lg border border-slate-200 p-0">
       <span className={`w-1 shrink-0 self-stretch ${stripe}`} aria-hidden />
       <button
         type="button"
@@ -154,6 +154,9 @@ function TaskCard({ task, onCardClick }) {
               {task.label}
             </Badge>
           )}
+          <Badge variant="secondary" className="text-[10px] font-normal">
+            {statusLabel(task.status)}
+          </Badge>
           {pri && (
             <span className={`rounded px-1 py-0.5 text-[10px] font-medium ${pri.bgColor} ${pri.color}`}>
               {pri.label}
@@ -177,7 +180,7 @@ function TaskCard({ task, onCardClick }) {
 }
 
 function KanbanColumn({
-  status,
+  group,
   tasks,
   canEdit,
   addValue,
@@ -185,18 +188,18 @@ function KanbanColumn({
   onAdd,
   onCardClick,
 }) {
-  const ids = useMemo(() => tasks.map((t) => t.id), [tasks]);
+  const ids = useMemo(() => tasks.map((t) => taskDndId(t.id)), [tasks]);
 
   return (
-    <KanbanBoard id={`col-${status}`} className="flex w-[min(100%,280px)] shrink-0 flex-col rounded-xl border border-slate-200 bg-slate-50/50">
+    <KanbanBoard id={colDndId(group.id)} className="flex w-[min(100%,280px)] shrink-0 flex-col rounded-xl border border-slate-200 bg-slate-50/50">
       <KanbanHeader className="border-b border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800">
         <h3 className="text-sm font-semibold text-slate-800">
-          {columnLabel(status)}{" "}
+          {group.group_name}{" "}
           <span className="font-normal text-slate-500">({tasks.length})</span>
         </h3>
       </KanbanHeader>
       <div className="flex min-h-[120px] flex-1 flex-col gap-2 p-2">
-        <SortableContext id={`sort-${status}`} items={ids} strategy={verticalListSortingStrategy}>
+        <SortableContext id={`sort-${group.id}`} items={ids} strategy={verticalListSortingStrategy}>
           {tasks.length === 0 && (
             <p className="py-6 text-center text-xs text-slate-400">Không có task</p>
           )}
@@ -213,12 +216,12 @@ function KanbanColumn({
             <Input
               placeholder="Thêm task…"
               className="h-8 text-xs"
-              value={addValue[status] || ""}
-              onChange={(e) => setAddValue((m) => ({ ...m, [status]: e.target.value }))}
+              value={addValue[group.id] || ""}
+              onChange={(e) => setAddValue((m) => ({ ...m, [group.id]: e.target.value }))}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  onAdd(status);
+                  onAdd(group.id);
                 }
               }}
             />
@@ -227,7 +230,7 @@ function KanbanColumn({
               size="sm"
               variant="secondary"
               className="h-8 shrink-0 px-2"
-              onClick={() => onAdd(status)}
+              onClick={() => onAdd(group.id)}
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -252,12 +255,9 @@ export default function KanbanView({
   openTaskId = null,
   onDismissOpenTask,
 }) {
-  const [columns, setColumns] = useState({
-    Todo: [],
-    InProgress: [],
-    Review: [],
-    Completed: [],
-  });
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupLoading, setNewGroupLoading] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [savingDrag, setSavingDrag] = useState(false);
   const [addValue, setAddValue] = useState({});
@@ -269,65 +269,72 @@ export default function KanbanView({
     }
   }, [openTaskId]);
 
-  const defaultGroupId = (groupsFull && groupsFull[0]?.id) || groups[0]?.id;
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
-
-  const applyGroupsToColumns = useCallback((data) => {
-    const roots = flattenRootTasks(data);
-    setColumns(bucketByColumn(roots));
-  }, []);
-
-  useEffect(() => {
-    applyGroupsToColumns(groups || []);
-  }, [groups, applyGroupsToColumns]);
+  const dndGroups = useMemo(() => groupsFull ?? groups, [groupsFull, groups]);
+  const visualGroups = useMemo(
+    () =>
+      (groups || []).map((g) => ({
+        ...g,
+        tasks: (g.tasks || []).filter((t) => !t.is_archived && t.parent_task_id == null),
+      })),
+    [groups],
+  );
 
   const reload = useCallback(async () => {
     if (onReloadGroups) {
       await onReloadGroups();
       return;
     }
-    const res = await taskGroupApi.getByProject(projectId);
-    const data = res.data.data || [];
-    applyGroupsToColumns(data);
-    return data;
-  }, [onReloadGroups, projectId, applyGroupsToColumns]);
+    await taskGroupApi.getByProject(projectId);
+  }, [onReloadGroups, projectId]);
 
   const openDetail = (task) => {
     setSelectedTaskId(task.id);
   };
 
-  const handleAdd = async (targetColumnStatus) => {
-    const title = (addValue[targetColumnStatus] || "").trim();
+  const handleAdd = async (groupId) => {
+    const title = (addValue[groupId] || "").trim();
     if (!title) return;
-    if (!defaultGroupId) {
-      showToast("Cần ít nhất một nhóm công việc (tạo ở chế độ Danh sách)", "error");
-      return;
-    }
-    const steps = STATUS_STEPS_AFTER_CREATE[targetColumnStatus] || [];
     try {
-      const res = await taskApi.create(defaultGroupId, { title, priority: "Medium" });
-      const id = res.data.data.id;
-      for (const s of steps) {
-        await taskApi.updateStatus(id, s);
-      }
+      await taskApi.create(groupId, { title, priority: "Medium" });
       showToast("Đã thêm công việc");
-      setAddValue((m) => ({ ...m, [targetColumnStatus]: "" }));
+      setAddValue((m) => ({ ...m, [groupId]: "" }));
       await reload();
     } catch (err) {
       showToast(
-        err.response?.data?.message ||
-          "Không tạo được task hoặc không đủ quyền đổi trạng thái (vd. Hoàn thành)",
+        err.response?.data?.message || "Không tạo được task",
         "error",
       );
       await reload();
     }
   };
 
+  const handleCreateGroup = async () => {
+    const name = newGroupName.trim();
+    if (!name) {
+      showToast("Nhập tên cột", "error");
+      return;
+    }
+    setNewGroupLoading(true);
+    try {
+      await taskGroupApi.create(projectId, { group_name: name });
+      showToast("Đã tạo cột mới");
+      setNewGroupOpen(false);
+      setNewGroupName("");
+      await reload();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Không tạo được cột", "error");
+    } finally {
+      setNewGroupLoading(false);
+    }
+  };
+
   const handleDragStart = ({ active }) => {
-    const task = findTaskInColumns(columns, active.id);
+    const activeTaskId = getTaskIdFromDndId(active.id);
+    if (activeTaskId == null) return;
+    const task = findTaskInGroups(dndGroups, activeTaskId);
     if (task) setActiveTask(task);
   };
 
@@ -335,51 +342,65 @@ export default function KanbanView({
     setActiveTask(null);
     if (!over || savingDrag || !canEditTasks || dragDisabled) return;
 
-    const activeTaskRef = findTaskInColumns(columns, active.id);
-    if (!activeTaskRef) return;
+    const activeTaskId = getTaskIdFromDndId(active.id);
+    if (activeTaskId == null) return;
+    const sourceGroup = findGroupContainingTask(dndGroups, activeTaskId);
+    if (!sourceGroup) return;
 
-    const overStr = String(over.id);
+    const targetGroupIdFromCol = getColumnIdFromDndId(over.id);
+    const overTaskId = getTaskIdFromDndId(over.id);
     let targetColumn;
+    let positionApi;
 
-    if (overStr.startsWith("col-")) {
-      targetColumn = overStr.slice(4);
+    if (targetGroupIdFromCol != null) {
+      targetColumn = targetGroupIdFromCol;
+      const targetGroup = dndGroups.find((g) => g.id === targetColumn);
+      if (!targetGroup) return;
+      positionApi = (targetGroup.tasks || []).length;
     } else {
-      const overTask = findTaskInColumns(columns, over.id);
-      if (!overTask) return;
-      targetColumn = statusToColumn(overTask.status);
+      if (overTaskId == null) return;
+      const targetGroup = findGroupContainingTask(dndGroups, overTaskId);
+      if (!targetGroup) return;
+      targetColumn = targetGroup.id;
+      positionApi = (targetGroup.tasks || []).findIndex((t) => t.id === overTaskId);
+      if (positionApi < 0) return;
     }
 
-    if (!KANBAN_STATUSES.includes(targetColumn)) return;
-
-    const sourceColumn = statusToColumn(activeTaskRef.status);
-
-    if (targetColumn === sourceColumn) {
-      const list = columns[sourceColumn];
-      const oldIndex = list.findIndex((t) => t.id === active.id);
+    if (targetColumn === sourceGroup.id) {
+      const list = sourceGroup.tasks || [];
+      const oldIndex = list.findIndex((t) => t.id === activeTaskId);
       if (oldIndex < 0) return;
-      let newIndex;
-      if (overStr.startsWith("col-")) {
-        newIndex = Math.max(0, list.length - 1);
-      } else {
-        newIndex = list.findIndex((t) => t.id === over.id);
-      }
+      const newIndex = targetGroupIdFromCol != null
+        ? Math.max(0, list.length - 1)
+        : list.findIndex((t) => t.id === overTaskId);
       if (newIndex < 0 || oldIndex === newIndex) return;
-      setColumns((prev) => ({
-        ...prev,
-        [sourceColumn]: arrayMove(prev[sourceColumn], oldIndex, newIndex),
-      }));
+      const reordered = arrayMove(list, oldIndex, newIndex);
+      const orderedIds = reordered.map((t) => t.id);
+      setSavingDrag(true);
+      try {
+        await taskApi.reorder(sourceGroup.id, orderedIds);
+        showToast("Đã cập nhật thứ tự");
+        await reload();
+      } catch (err) {
+        showToast(err.response?.data?.message || "Không sắp xếp được", "error");
+        await reload();
+      } finally {
+        setSavingDrag(false);
+      }
       return;
     }
 
     setSavingDrag(true);
     try {
-      await taskApi.updateStatus(active.id, targetColumn);
-      showToast("Đã cập nhật trạng thái");
+      await taskApi.move(activeTaskId, {
+        target_group_id: targetColumn,
+        position: positionApi,
+      });
+      showToast("Đã chuyển task sang cột khác");
       await reload();
     } catch (err) {
       showToast(
-        err.response?.data?.message ||
-          "Không thể chuyển trạng thái (kiểm tra luồng: Todo → Đang làm → …)",
+        err.response?.data?.message || "Không di chuyển được task",
         "error",
       );
       await reload();
@@ -399,10 +420,18 @@ export default function KanbanView({
 
   return (
     <div className="space-y-3">
-      {!defaultGroupId && (
+      {(visualGroups || []).length === 0 && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Chưa có nhóm công việc. Hãy chuyển sang <strong>Danh sách</strong> và tạo nhóm trước.
+          Chưa có cột nào. Hãy tạo cột đầu tiên để bắt đầu.
         </p>
+      )}
+      {canEditTasks && (
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" className="gap-2" onClick={() => setNewGroupOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Tạo cột mới
+          </Button>
+        </div>
       )}
 
       <DndContext
@@ -412,11 +441,11 @@ export default function KanbanView({
         onDragEnd={handleDragEnd}
       >
         <div className="flex gap-3 overflow-x-auto pb-2">
-          {KANBAN_STATUSES.map((status) => (
+          {visualGroups.map((group) => (
             <KanbanColumn
-              key={status}
-              status={status}
-              tasks={columns[status]}
+              key={group.id}
+              group={group}
+              tasks={group.tasks || []}
               canEdit={canEditTasks}
               addValue={addValue}
               setAddValue={setAddValue}
@@ -434,6 +463,36 @@ export default function KanbanView({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <Dialog open={newGroupOpen} onOpenChange={setNewGroupOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tạo cột Kanban</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="kanban-col-name">Tên cột</Label>
+            <Input
+              id="kanban-col-name"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="Ví dụ: UX Review"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewGroupOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={newGroupLoading}
+              onClick={handleCreateGroup}
+            >
+              {newGroupLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Tạo cột
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <TaskDetailPanel
         taskId={selectedTaskId}
