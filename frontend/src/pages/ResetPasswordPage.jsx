@@ -79,10 +79,10 @@ const ResetPasswordPage = () => {
 
   if (checkingToken) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 px-4">
-        <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md text-center space-y-4">
+      <div className="flex items-center justify-center min-h-screen bg-background px-4">
+        <div className="w-full max-w-md bg-card text-card-foreground p-8 rounded-lg border border-border shadow-md text-center space-y-4">
           <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
-          <p className="text-sm text-slate-600">Đang kiểm tra link đặt lại mật khẩu...</p>
+          <p className="text-sm text-muted-foreground">Đang kiểm tra link đặt lại mật khẩu...</p>
         </div>
       </div>
     );
@@ -90,10 +90,10 @@ const ResetPasswordPage = () => {
 
   if (!tokenValid && !message) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 px-4">
-        <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md space-y-6 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">Link không hợp lệ</h1>
-          <p className="text-slate-600 text-sm">
+      <div className="flex items-center justify-center min-h-screen bg-background px-4">
+        <div className="w-full max-w-md bg-card text-card-foreground p-8 rounded-lg border border-border shadow-md space-y-6 text-center">
+          <h1 className="text-2xl font-bold text-foreground">Link không hợp lệ</h1>
+          <p className="text-muted-foreground text-sm">
             {error || "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn."}
           </p>
           <Button
@@ -108,11 +108,11 @@ const ResetPasswordPage = () => {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-slate-50 px-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md space-y-6">
+    <div className="flex items-center justify-center min-h-screen bg-background px-4">
+      <div className="w-full max-w-md bg-card text-card-foreground p-8 rounded-lg border border-border shadow-md space-y-6">
         {message ? (
           <div className="space-y-6 text-center">
-            <div className="bg-green-50 text-green-600 p-4 rounded text-center">
+            <div className="bg-emerald-500/10 text-emerald-400 p-4 rounded text-center">
               <CheckCircle2 className="h-8 w-8 inline-block mb-2" />
               <h1 className="text-xl font-bold mb-2">Đổi mật khẩu thành công</h1>
               <p className="text-sm">
@@ -129,11 +129,15 @@ const ResetPasswordPage = () => {
         ) : (
           <>
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-slate-900">Đặt lại mật khẩu</h1>
-              <p className="text-slate-500 text-sm mt-2">Nhập mật khẩu mới cho tài khoản của bạn.</p>
+              <h1 className="text-2xl font-bold text-foreground">Đặt lại mật khẩu</h1>
+              <p className="text-muted-foreground text-sm mt-2">Nhập mật khẩu mới cho tài khoản của bạn.</p>
             </div>
 
-            {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm text-center">{error}</div>}
+            {error && (
+              <div className="bg-destructive/10 text-destructive p-3 rounded text-sm text-center">
+                {error}
+              </div>
+            )}
           <form onSubmit={handleReset} className="space-y-4">
             <div className="space-y-2">
               <Label>Mật khẩu mới</Label>
@@ -145,11 +149,15 @@ const ResetPasswordPage = () => {
                     required
                     className="pr-10"
                 />
-                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-2.5 text-slate-400">
+                 <button
+                   type="button"
+                   onClick={() => setShowPassword(!showPassword)}
+                   className="absolute right-3 top-2.5 text-muted-foreground"
+                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Mật khẩu phải có tối thiểu 8 ký tự, bao gồm chữ in hoa và ký tự đặc biệt.
               </p>
             </div>
@@ -164,7 +172,11 @@ const ResetPasswordPage = () => {
                     required
                     className="pr-10"
                 />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-2.5 text-slate-400">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-2.5 text-muted-foreground"
+                >
                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>

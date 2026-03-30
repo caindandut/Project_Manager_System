@@ -13,7 +13,7 @@ export default function MessageInput({ onSend, disabled = false }) {
   };
 
   return (
-    <div className="border-t border-slate-200 bg-white p-3">
+    <div className="border-t border-border bg-background p-3">
       <div className="flex items-end gap-2">
         <textarea
           value={text}
@@ -26,7 +26,7 @@ export default function MessageInput({ onSend, disabled = false }) {
           }}
           rows={2}
           placeholder="Nhập tin nhắn..."
-          className="min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400"
+          className="min-h-[44px] flex-1 resize-none rounded-xl border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:border-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disabled}
         />
         <Button type="button" variant="outline" size="icon" disabled title="Đính kèm file (sắp ra mắt)">

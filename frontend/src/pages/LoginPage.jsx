@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Moon, Sun } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,6 +17,7 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { login, loginGoogle } = useAuth();
+  const { resolvedTheme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -52,9 +54,22 @@ const LoginPage = () => {
   }, []);
 
   return (
-    <div className="w-full h-screen flex justify-center items-center bg-white">
+    <div className="w-full h-screen flex justify-center items-center bg-background text-foreground">
+      <div className="fixed top-4 right-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          aria-label="Chuyển chế độ màu"
+          title="Chuyển chế độ màu"
+          className="h-10 w-10 rounded-lg"
+        >
+          {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
+      </div>
       <div className="w-full flex flex-col justify-center items-center px-8 md:px-16 lg:px-24">
-        <div className="w-full max-w-md space-y-8 bg-white rounded-xl shadow-lg p-8">
+        <div className="w-full max-w-md space-y-8 bg-card text-card-foreground rounded-xl border border-border shadow-lg p-8">
         
           <div className="flex flex-col space-y-2">
             <div className="flex justify-center mb-4">
@@ -64,16 +79,16 @@ const LoginPage = () => {
                 className="h-12 w-auto"
               />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 text-center">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground text-center">
               Đăng nhập
             </h1>
-            <p className="text-slate-500 text-center">
+            <p className="text-muted-foreground text-center">
             Chào mừng trở lại. Đăng nhập để bắt đầu làm việc.
             </p>
           </div>
 
           {error && (
-                <div className="bg-red-50 text-red-600 p-3 rounded text-sm text-center">
+                <div className="bg-destructive/10 text-destructive p-3 rounded text-sm text-center">
                     {error}
                 </div>
             )}
@@ -105,7 +120,7 @@ const LoginPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
@@ -139,7 +154,7 @@ const LoginPage = () => {
               <Separator />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-slate-500">Hoặc</span>
+              <span className="bg-background px-2 text-muted-foreground">Hoặc</span>
             </div>
           </div>
 

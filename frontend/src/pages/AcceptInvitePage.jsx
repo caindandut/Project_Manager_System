@@ -89,7 +89,7 @@ export default function AcceptInvitePage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
       <Card className="w-full max-w-md shadow-md">
         <CardHeader className="space-y-2 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
@@ -104,7 +104,7 @@ export default function AcceptInvitePage() {
           {tokenValid === null && (
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-              <p className="text-sm text-slate-600">Đang xác minh link mời...</p>
+              <p className="text-sm text-muted-foreground">Đang xác minh link mời...</p>
             </div>
           )}
           {tokenValid === false && (
@@ -124,14 +124,14 @@ export default function AcceptInvitePage() {
           {tokenValid === true && (
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   {error}
                 </div>
               )}
 
               {success && (
-                <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
                   {success}
                 </div>

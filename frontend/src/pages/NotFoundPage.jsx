@@ -9,7 +9,7 @@ const NotFoundPage = () => {
   }, []);
 
   return (
-    <div className="w-full h-screen flex justify-center items-center bg-white">
+    <div className="w-full h-screen flex justify-center items-center bg-background text-foreground">
       <div className="w-full flex flex-col justify-center items-center px-8 md:px-16 lg:px-24">
         <div className="w-full max-w-md space-y-8 text-center">
 
@@ -22,12 +22,12 @@ const NotFoundPage = () => {
           </div>
 
           <div className="space-y-4">
-            <h1 className="text-9xl font-bold text-slate-900 leading-none text-center">
+            <h1 className="text-9xl font-bold text-foreground leading-none text-center">
               404
             </h1>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-slate-900 leading-none">Không tìm thấy trang</h2>
-              <p className="text-slate-500 text-base leading-relaxed text-center">
+              <h2 className="text-2xl font-bold text-foreground leading-none">Không tìm thấy trang</h2>
+              <p className="text-muted-foreground text-base leading-relaxed text-center">
               Rất tiếc! Trang bạn đang cố truy cập không tồn tại.
               </p>
             </div>

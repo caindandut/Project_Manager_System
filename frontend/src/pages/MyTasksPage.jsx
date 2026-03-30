@@ -164,8 +164,8 @@ export default function MyTasksPage() {
               <ClipboardList className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Công việc của tôi</h1>
-              <p className="text-sm text-slate-500">
+              <h1 className="text-2xl font-bold text-foreground">Công việc của tôi</h1>
+              <p className="text-sm text-muted-foreground">
                 {loading ? "Đang tải…" : `${totalTasks} công việc được giao`}
               </p>
             </div>
@@ -173,12 +173,12 @@ export default function MyTasksPage() {
         </div>
 
         {/* Thanh lọc */}
-        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end">
           <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1">
-              <span className="text-[11px] font-medium text-slate-500">Trạng thái</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Trạng thái</span>
               <Select value={status || EMPTY} onValueChange={(v) => setStatus(v === EMPTY ? "" : v)}>
-                <SelectTrigger className="h-9 bg-white text-xs">
+                <SelectTrigger className="h-9 text-xs bg-transparent">
                   <SelectValue placeholder="Tất cả" />
                 </SelectTrigger>
                 <SelectContent>
@@ -192,12 +192,12 @@ export default function MyTasksPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <span className="text-[11px] font-medium text-slate-500">Ưu tiên</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Ưu tiên</span>
               <Select
                 value={priority || EMPTY}
                 onValueChange={(v) => setPriority(v === EMPTY ? "" : v)}
               >
-                <SelectTrigger className="h-9 bg-white text-xs">
+                <SelectTrigger className="h-9 text-xs bg-transparent">
                   <SelectValue placeholder="Tất cả" />
                 </SelectTrigger>
                 <SelectContent>
@@ -211,12 +211,12 @@ export default function MyTasksPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <span className="text-[11px] font-medium text-slate-500">Dự án</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Dự án</span>
               <Select
                 value={projectId || EMPTY}
                 onValueChange={(v) => setProjectId(v === EMPTY ? "" : v)}
               >
-                <SelectTrigger className="h-9 bg-white text-xs">
+                <SelectTrigger className="h-9 text-xs bg-transparent">
                   <SelectValue placeholder="Tất cả dự án" />
                 </SelectTrigger>
                 <SelectContent>
@@ -230,11 +230,11 @@ export default function MyTasksPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <span className="text-[11px] font-medium text-slate-500">Tìm kiếm</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Tìm kiếm</span>
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  className="h-9 bg-white pl-8 text-xs"
+                  className="h-9 pl-8 text-xs"
                   placeholder="Theo tiêu đề…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -257,14 +257,14 @@ export default function MyTasksPage() {
         </div>
 
         {loading && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
             <p className="mt-3 text-sm">Đang tải công việc…</p>
           </div>
         )}
 
         {!loading && error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
             <Button variant="outline" size="sm" className="ml-3 h-8" onClick={loadTasks}>
               Thử lại
@@ -273,7 +273,7 @@ export default function MyTasksPage() {
         )}
 
         {!loading && !error && displayedGroups.length === 0 && (
-          <p className="py-16 text-center text-sm text-slate-500">
+          <p className="py-16 text-center text-sm text-muted-foreground">
             {hasFilters
               ? "Không có công việc khớp bộ lọc."
               : "Bạn chưa được giao công việc nào trong dự án."}
@@ -289,30 +289,30 @@ export default function MyTasksPage() {
               return (
                 <div
                   key={g.project_id}
-                  className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                  className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
                 >
                   <button
                     type="button"
                     onClick={() => toggleProjectOpen(g.project_id)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-accent"
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? "" : "-rotate-90"}`}
+                        className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`}
                       />
                       <span
                         className="h-2 w-2 shrink-0 rounded-full"
                         style={{ backgroundColor: barColor }}
                       />
-                      <span className="truncate font-semibold text-slate-800">{g.project_name}</span>
+                      <span className="truncate font-semibold text-foreground">{g.project_name}</span>
                     </span>
-                    <span className="shrink-0 text-xs text-slate-500">
+                    <span className="shrink-0 text-xs text-muted-foreground">
                       {count} công việc
                     </span>
                   </button>
 
                   {open && (
-                    <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                    <ul className="divide-y divide-border border-t border-border">
                       {(g.tasks || []).map((t) => {
                         const pri = TASK_PRIORITY_OPTIONS.find((p) => p.value === t.priority);
                         const done = t.status === "Completed";
@@ -321,19 +321,19 @@ export default function MyTasksPage() {
                             <button
                               type="button"
                               onClick={() => goToTask(g.project_id, t.id)}
-                              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50/80"
+                              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent"
                             >
                               <span
                                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                                   done
                                     ? "border-emerald-400 bg-emerald-50 text-emerald-600"
-                                    : "border-slate-300 bg-white"
+                                    : "border-border bg-background"
                                 }`}
                                 aria-hidden
                               >
                                 {done ? "✓" : ""}
                               </span>
-                              <span className="min-w-0 flex-1 text-sm font-medium text-slate-800">
+                              <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
                                 {t.title}
                               </span>
                               {t.label && (
@@ -349,7 +349,7 @@ export default function MyTasksPage() {
                                 </span>
                               )}
                               {t.deadline && (
-                                <span className="flex shrink-0 items-center gap-0.5 text-xs text-slate-500">
+                                <span className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">
                                   <Calendar className="h-3 w-3" />
                                   {fmtDeadline(t.deadline)}
                                 </span>
@@ -367,21 +367,21 @@ export default function MyTasksPage() {
         )}
 
         {!loading && !error && totalTasks > 0 && (
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 sm:text-sm">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground sm:text-sm">
             <span>
-              <strong className="text-slate-800">{buckets.todo}</strong> chưa làm
+              <strong className="text-foreground">{buckets.todo}</strong> chưa làm
             </span>
-            <span className="text-slate-300">|</span>
+            <span className="text-muted-foreground/80">|</span>
             <span>
-              <strong className="text-slate-800">{buckets.inProgress}</strong> đang làm
+              <strong className="text-foreground">{buckets.inProgress}</strong> đang làm
             </span>
-            <span className="text-slate-300">|</span>
+            <span className="text-muted-foreground/80">|</span>
             <span>
-              <strong className="text-slate-800">{buckets.review}</strong> chờ xác nhận
+              <strong className="text-foreground">{buckets.review}</strong> chờ xác nhận
             </span>
-            <span className="text-slate-300">|</span>
+            <span className="text-muted-foreground/80">|</span>
             <span>
-              <strong className="text-slate-800">{buckets.completed}</strong> hoàn thành
+              <strong className="text-foreground">{buckets.completed}</strong> hoàn thành
             </span>
           </div>
         )}

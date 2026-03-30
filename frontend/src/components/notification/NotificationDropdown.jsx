@@ -129,7 +129,7 @@ export default function NotificationDropdown() {
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
-          className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 transition-colors"
+          className="relative rounded-lg p-2 text-muted-foreground hover:bg-accent transition-colors"
           type="button"
           title="Thông báo"
           aria-label="Thông báo"
@@ -145,7 +145,7 @@ export default function NotificationDropdown() {
 
       <DropdownMenuContent align="end" className="w-[360px] p-0">
         <div className="flex items-center justify-between px-3 py-2.5">
-          <p className="text-sm font-semibold text-slate-800">Thông báo</p>
+          <p className="text-sm font-semibold text-foreground">Thông báo</p>
           <Button
             type="button"
             variant="ghost"
@@ -162,7 +162,7 @@ export default function NotificationDropdown() {
 
         <div className="max-h-[360px] overflow-y-auto px-1 py-1">
           {!loading && visibleItems.length === 0 && (
-            <p className="px-2 py-6 text-center text-xs text-slate-400">Chưa có thông báo nào</p>
+            <p className="px-2 py-6 text-center text-xs text-muted-foreground">Chưa có thông báo nào</p>
           )}
 
           {visibleItems.map((item) => (
@@ -172,16 +172,16 @@ export default function NotificationDropdown() {
               onClick={() => {
                 void markOneAsRead(item);
               }}
-              className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-slate-50"
+              className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-accent"
             >
               <span
                 className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${
-                  item.is_read ? "bg-slate-300" : "bg-blue-500"
+                  item.is_read ? "bg-muted" : "bg-blue-500"
                 }`}
               />
               <div className="min-w-0 flex-1">
-                <p className="line-clamp-2 text-sm text-slate-700">{item.content || "Thông báo mới"}</p>
-                <p className="mt-0.5 text-[11px] text-slate-400">
+                <p className="line-clamp-2 text-sm text-foreground">{item.content || "Thông báo mới"}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   {formatRelativeTime(item.created_at)}
                 </p>
               </div>

@@ -31,9 +31,9 @@ const ForgotPasswordPage = () => {
   }, []);
 
   return (
-    <div className="w-full h-screen flex justify-center items-center bg-white">
+    <div className="w-full h-screen flex justify-center items-center bg-background text-foreground">
       <div className="w-full flex flex-col justify-center items-center px-8 md:px-16 lg:px-24">
-        <div className="w-full max-w-md space-y-8 bg-white rounded-xl shadow-lg p-8">
+        <div className="w-full max-w-md space-y-8 bg-card text-card-foreground rounded-xl border border-border shadow-lg p-8">
            <div className="flex justify-center mb-4">
               <img 
                 src="https://share-gcdn.basecdn.net/brand/logo.full.png" 
@@ -44,12 +44,12 @@ const ForgotPasswordPage = () => {
 
           {isSuccess ? (
             <div className="space-y-6 text-center">
-              <div className="bg-green-50 text-green-600 p-3 rounded text-sm text-center">
+              <div className="bg-emerald-500/10 text-emerald-400 p-3 rounded text-sm text-center">
                 <CheckCircle2 className="h-5 w-5 inline-block mr-2" />
                 Email đã được gửi thành công! Vui lòng kiểm tra email của bạn.
               </div>
-              <h2 className="text-2xl font-bold text-slate-900">Kiểm tra email của bạn</h2>
-              <p className="text-slate-500">
+              <h2 className="text-2xl font-bold text-foreground">Kiểm tra email của bạn</h2>
+              <p className="text-muted-foreground">
                 Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu đến <strong>{email}</strong>.
                 Vui lòng kiểm tra cả hộp thư rác (spam).
               </p>
@@ -60,10 +60,10 @@ const ForgotPasswordPage = () => {
           ) : (
             <>
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 text-center">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground text-center">
                 Khôi phục mật khẩu
               </h1>
-              <p className="text-slate-500 text-sm leading-relaxed text-center">
+              <p className="text-muted-foreground text-sm leading-relaxed text-center">
                 Hãy nhập thông tin của bạn. Hướng dẫn khôi phục mật khẩu sẽ được gửi đến email của bạn.
               </p>
             </div>
@@ -73,7 +73,7 @@ const ForgotPasswordPage = () => {
           {!isSuccess && (
             <>
               {error && (
-                <div className="bg-red-50 text-red-600 p-3 rounded text-sm text-center">
+                <div className="bg-destructive/10 text-destructive p-3 rounded text-sm text-center">
                   <AlertCircle className="h-5 w-5 inline-block mr-2" />
                   {error}
                 </div>
@@ -85,7 +85,7 @@ const ForgotPasswordPage = () => {
                   <Input 
                     id="email" 
                     type="email" 
-                    className="h-11 bg-slate-50"
+                    className="h-11"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -107,7 +107,7 @@ const ForgotPasswordPage = () => {
           <div className="flex justify-center">
             <Link 
               to="/login" 
-              className="flex items-center text-sm font-medium text-slate-600 hover:text-slate-900 gap-2"
+              className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground gap-2"
             >
               <ArrowLeft size={16} />
               Quay lại đăng nhập
