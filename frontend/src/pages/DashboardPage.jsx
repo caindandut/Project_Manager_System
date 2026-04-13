@@ -157,7 +157,7 @@ function EmptyState({ title }) {
   );
 }
 
-function AdminDashboard({ stats, usersMini, projectTop5 }) {
+function AdminDashboard({ stats, usersMini, projectTop5, showUserManagement = true }) {
   const cards = [
     { label: "Tổng người dùng", value: stats.totalUsers ?? 0, icon: Users, iconBg: "bg-blue-500" },
     { label: "Dự án hoạt động", value: stats.totalProjects ?? 0, icon: FolderKanban, iconBg: "bg-emerald-500" },
@@ -178,7 +178,6 @@ function AdminDashboard({ stats, usersMini, projectTop5 }) {
         <Card className="bg-white shadow-sm border-0 shadow-slate-200/60">
           <CardHeader>
             <CardTitle className="text-lg">Phân bố task theo trạng thái</CardTitle>
-            <CardDescription>Dữ liệu realtime từ /api/reports/dashboard</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
             {pieData.length === 0 ? (
@@ -247,34 +246,36 @@ function AdminDashboard({ stats, usersMini, projectTop5 }) {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0 shadow-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Quản lý người dùng</CardTitle>
-              <CardDescription>Danh sách thành viên mới nhất</CardDescription>
-            </div>
-            <Link to="/members" className="text-sm font-medium text-blue-600 hover:underline">
-              Xem tất cả
-            </Link>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {usersMini.length === 0 ? (
-              <EmptyState title="Chưa có dữ liệu người dùng." />
-            ) : (
-              usersMini.map((u) => (
-                <div key={u.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{u.full_name || u.email}</p>
-                    <p className="text-xs text-slate-500">{u.email}</p>
+        {showUserManagement && (
+          <Card className="bg-white shadow-sm border-0 shadow-slate-200/60">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Quản lý người dùng</CardTitle>
+                <CardDescription>Danh sách thành viên mới nhất</CardDescription>
+              </div>
+              <Link to="/members" className="text-sm font-medium text-blue-600 hover:underline">
+                Xem tất cả
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {usersMini.length === 0 ? (
+                <EmptyState title="Chưa có dữ liệu người dùng." />
+              ) : (
+                usersMini.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{u.full_name || u.email}</p>
+                      <p className="text-xs text-slate-500">{u.email}</p>
+                    </div>
+                    <Badge variant={u.status === "Active" ? "success" : "secondary"}>
+                      {u.status || "Unknown"}
+                    </Badge>
                   </div>
-                  <Badge variant={u.status === "Active" ? "success" : "secondary"}>
-                    {u.status || "Unknown"}
-                  </Badge>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
@@ -288,6 +289,14 @@ function DirectorDashboard({ stats, projectTop5 }) {
     { label: "Thành viên team", value: stats.teamMemberCount ?? 0, icon: Users, iconBg: "bg-emerald-500" },
   ];
   const taskDistribution = Array.isArray(stats.taskDistribution) ? stats.taskDistribution : [];
+  const recentActivity = Array.isArray(stats.recentActivity) ? stats.recentActivity : [];
+  const pieData =
+    taskDistribution.length > 0
+      ? taskDistribution
+      : ["Todo", "InProgress", "Review", "Completed", "Overdue"].map((s) => ({
+          label: normalizeStatusLabel(s),
+          count: 0,
+        }));
 
   return (
     <div className="space-y-6">
@@ -295,6 +304,57 @@ function DirectorDashboard({ stats, projectTop5 }) {
         {cards.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Card className="bg-white shadow-sm border-0 shadow-slate-200/60">
+          <CardHeader>
+            <CardTitle className="text-lg">Phân bố task theo trạng thái</CardTitle>
+          </CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} dataKey="count" nameKey="label" outerRadius={95}>
+                  {pieData.map((entry, index) => (
+                    <Cell
+                      key={entry.label || index}
+                      fill={PIE_COLORS[index % PIE_COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+            {taskDistribution.length === 0 && (
+              <p className="mt-3 text-center text-sm text-slate-500">
+                Hiện chưa có task trong dự án đang quản lý.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white shadow-sm border-0 shadow-slate-200/60">
+          <CardHeader>
+            <CardTitle className="text-lg">Top 5 dự án theo số task</CardTitle>
+            <CardDescription>Tổng hợp từ thống kê từng dự án</CardDescription>
+          </CardHeader>
+          <CardContent className="h-72">
+            {projectTop5.length === 0 ? (
+              <EmptyState title="Chưa có dự án để hiển thị biểu đồ." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={projectTop5}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="tasks" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -310,7 +370,7 @@ function DirectorDashboard({ stats, projectTop5 }) {
               projectTop5.map((p) => (
                 <div key={p.id}>
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-700">{p.name}</span>
+                    <span className="truncate font-medium text-slate-700">{p.name}</span>
                     <span className="text-slate-500">{p.progress}%</span>
                   </div>
                   <div className="h-2.5 rounded-full bg-slate-100">
@@ -327,22 +387,28 @@ function DirectorDashboard({ stats, projectTop5 }) {
 
         <Card className="bg-white shadow-sm border-0 shadow-slate-200/60">
           <CardHeader>
-            <CardTitle className="text-lg">Phân bố task</CardTitle>
-            <CardDescription>Theo trạng thái công việc</CardDescription>
+            <CardTitle className="text-lg">Hoạt động gần đây</CardTitle>
+            <CardDescription>5 hoạt động mới nhất trong hệ thống</CardDescription>
           </CardHeader>
-          <CardContent className="h-72">
-            {taskDistribution.length === 0 ? (
-              <EmptyState title="Chưa có dữ liệu task." />
+          <CardContent className="space-y-3">
+            {recentActivity.length === 0 ? (
+              <EmptyState title="Chưa có hoạt động nào." />
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={taskDistribution}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#10b981" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              recentActivity.map((item) => (
+                <div key={item.id} className="flex items-start gap-3 rounded-lg border border-slate-100 p-3">
+                  <div className="mt-0.5 rounded-full bg-blue-50 p-2">
+                    <Activity className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-900">
+                      {item.details || item.action}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {item.user?.full_name || "Hệ thống"} · {formatDateTime(item.created_at)}
+                    </p>
+                  </div>
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
@@ -462,17 +528,21 @@ const DashboardPage = () => {
   const hasUser = user && user.role;
 
   const getTitle = (role) => {
-    if (role === "Admin") return "Tổng quan Dashboard";
-    if (role === "Director") return "Tổng quan Điều hành";
+    if (role === "Director") return "Tổng quan Dashboard";
     return null;
   };
 
   const normalizedStats = useMemo(() => {
     const taskDistribution = Array.isArray(dashboardStats.taskDistribution)
-      ? dashboardStats.taskDistribution.map((item) => ({
-          ...item,
-          label: normalizeStatusLabel(item.label),
-        }))
+      ? dashboardStats.taskDistribution.map((item, idx) => {
+          const rawLabel = item?.label ?? item?.status ?? item?.state ?? String(idx);
+          const rawCount = item?.count ?? item?.value ?? item?.total ?? 0;
+          return {
+            ...item,
+            label: normalizeStatusLabel(rawLabel),
+            count: Number(rawCount) || 0,
+          };
+        })
       : [];
     return { ...dashboardStats, taskDistribution };
   }, [dashboardStats]);
@@ -505,6 +575,7 @@ const DashboardPage = () => {
           .slice(0, 5);
         if (!cancelled) setProjectTop5(top);
 
+        // Chỉ Admin cần dữ liệu quản lý người dùng
         if (user.role === "Admin") {
           const usersRes = await userApi.getAll();
           const users = Array.isArray(usersRes.data?.data) ? usersRes.data.data : [];
@@ -546,14 +617,14 @@ const DashboardPage = () => {
               {errorMessage}
             </CardContent>
           </Card>
-        ) : user.role === "Admin" ? (
-          <AdminDashboard
-            stats={normalizedStats}
-            usersMini={usersMini}
-            projectTop5={projectTop5}
-          />
         ) : user.role === "Director" ? (
           <DirectorDashboard stats={normalizedStats} projectTop5={projectTop5} />
+        ) : user.role === "Admin" ? (
+          <Card className="bg-white shadow-sm">
+            <CardContent className="py-8 text-center text-sm text-slate-600">
+              Bạn không có quyền xem trang Tổng quan.
+            </CardContent>
+          </Card>
         ) : user.role === "Employee" ? (
           <EmployeeDashboard
             fullName={user.full_name || user.fullName}

@@ -17,9 +17,18 @@ import {
   LogOut,
   Moon,
   Sun,
+  MoreVertical,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import NotificationDropdown from "@/components/notification/NotificationDropdown";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /**
  * Điều hướng sidebar theo vai trò (GĐ2 mục 2.12: /tasks bật cho mọi vai trò có menu).
@@ -27,11 +36,8 @@ import { Button } from "@/components/ui/button";
 const NAV_BY_ROLE = {
   Admin: {
     main: [
-      { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Dự án", icon: FolderKanban, href: "/projects" },
-      { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
-      { label: "Tin nhắn", icon: MessageSquare, href: "/chat" },
-      { label: "Thành viên", icon: Users, href: "/members" },
+      // Admin chỉ quản lý danh sách nhân viên
+      { label: "Nhân viên", icon: Users, href: "/members" },
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
     ],
     system: [
@@ -45,26 +51,23 @@ const NAV_BY_ROLE = {
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
       { label: "Tin nhắn", icon: MessageSquare, href: "/chat" },
       { label: "Thành viên", icon: Users, href: "/members" },
-    ],
-    system: [
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
     ],
+    system: [],
   },
   Employee: {
     main: [
       { label: "Tổng quan", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Dự án", icon: FolderKanban, href: "/projects" },
       { label: "Công việc của tôi", icon: ClipboardList, href: "/tasks" },
-      { label: "Tin nhắn", icon: MessageSquare, href: "/chat" },
-    ],
-    system: [
       { label: "Hồ sơ cá nhân", icon: UserCircle, href: "/profile" },
     ],
+    system: [],
   },
 };
 
 const BRAND = {
-  Admin: { name: "Không gian Quản trị", sub: "Quản lý Dự án" },
+  Admin: { name: "Trang Quản Trị", sub: "Quản lý Dự án" },
   Director: { name: "NexusDir", sub: null },
   Employee: { name: "TaskMaster", sub: null },
 };
@@ -93,9 +96,18 @@ function UserAvatar({ name, size = "h-9 w-9 text-sm", isOnline = false }) {
   );
 }
 
-function NavItem({ icon: IconComponent, label, href, badge, active, disabled, onNavigate }) {
-  const baseClasses =
-    "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors";
+function NavItem({
+  icon: IconComponent,
+  label,
+  href,
+  badge,
+  active,
+  disabled,
+  onNavigate,
+  collapsed,
+}) {
+  const baseClasses = "group flex w-full items-center rounded-lg py-2.5 text-sm font-medium transition-colors";
+  const layoutClasses = collapsed ? "justify-center px-2 gap-0" : "gap-3 px-3";
   const enabledClasses = active
     ? "bg-blue-600 text-white"
     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground";
@@ -113,8 +125,10 @@ function NavItem({ icon: IconComponent, label, href, badge, active, disabled, on
     <Link
       to={href}
       onClick={handleClick}
-      className={`${baseClasses} ${disabled ? disabledClasses : enabledClasses}`}
+      className={`${baseClasses} ${layoutClasses} ${disabled ? disabledClasses : enabledClasses}`}
       aria-disabled={disabled ? "true" : "false"}
+      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
     >
       {createElement(IconComponent, {
         className: `h-5 w-5 shrink-0 ${
@@ -123,15 +137,17 @@ function NavItem({ icon: IconComponent, label, href, badge, active, disabled, on
             : "text-muted-foreground group-hover:text-foreground"
         }`,
       })}
-      <span className="flex-1 text-left">
-        {label}
-        {disabled && (
-          <span className="ml-2 inline-flex items-center rounded-full bg-muted px-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Sắp ra mắt
-          </span>
-        )}
-      </span>
-      {badge != null && (
+      {!collapsed && (
+        <span className="flex-1 text-left">
+          {label}
+          {disabled && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-muted px-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Sắp ra mắt
+            </span>
+          )}
+        </span>
+      )}
+      {!collapsed && badge != null && (
         <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-semibold text-white">
           {badge}
         </span>
@@ -146,6 +162,7 @@ export default function DashboardLayout({ children }) {
   const { resolvedTheme, toggleTheme } = useTheme();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const role = user?.role || "Employee";
   const nav = NAV_BY_ROLE[role] || NAV_BY_ROLE.Employee;
@@ -167,20 +184,33 @@ export default function DashboardLayout({ children }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-card text-card-foreground transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-card text-card-foreground transition-[width] duration-300 transition-transform lg:static lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } ${sidebarCollapsed ? "w-20" : "w-64"}`}
       >
-        <div className="flex h-16 items-center gap-3 px-5 border-b border-border">
+        <div
+          className={`flex h-16 items-center gap-3 border-b border-border ${sidebarCollapsed ? "px-2" : "px-5"}`}
+        >
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
             <FolderKanban className="h-5 w-5 text-white" />
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-card-foreground">{brand.name}</p>
-            {brand.sub && (
-              <p className="truncate text-xs text-muted-foreground">{brand.sub}</p>
-            )}
-          </div>
+          {!sidebarCollapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-card-foreground">{brand.name}</p>
+              {brand.sub && <p className="truncate text-xs text-muted-foreground">{brand.sub}</p>}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            className="ml-auto hidden items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors lg:inline-flex"
+            aria-label={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
+            title={sidebarCollapsed ? "Mở rộng" : "Thu gọn"}
+          >
+            {sidebarCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+          </button>
+
           <button
             className="ml-auto rounded-lg p-1 text-muted-foreground hover:text-foreground lg:hidden"
             onClick={closeSidebar}
@@ -189,28 +219,27 @@ export default function DashboardLayout({ children }) {
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className={`flex-1 overflow-y-auto py-4 space-y-1 ${sidebarCollapsed ? "px-2" : "px-3"}`}>
           {nav.main.map((item) => (
             <NavItem
               key={item.label}
               {...item}
               active={isActive(item.href)}
               onNavigate={closeSidebar}
+              collapsed={sidebarCollapsed}
             />
           ))}
 
           {nav.system.length > 0 && (
             <>
               <div className="my-4 border-t border-border" />
-              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Hệ thống
-              </p>
               {nav.system.map((item) => (
                 <NavItem
                   key={item.label}
                   {...item}
                   active={isActive(item.href)}
                   onNavigate={closeSidebar}
+                  collapsed={sidebarCollapsed}
                 />
               ))}
             </>
@@ -220,17 +249,38 @@ export default function DashboardLayout({ children }) {
         <div className="border-t border-border px-3 py-3">
           <div className="flex items-center gap-3 rounded-lg px-2 py-2">
             <UserAvatar name={fullName} size="h-10 w-10 text-sm" isOnline={connected} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-foreground">{fullName}</p>
-              <p className="truncate text-xs text-muted-foreground">{email}</p>
-            </div>
-            <button
-              onClick={logout}
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-              title="Đăng xuất"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            {!sidebarCollapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">{fullName}</p>
+                <p className="truncate text-xs text-muted-foreground">{email}</p>
+              </div>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={`h-9 w-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors ${
+                    sidebarCollapsed ? "ml-auto" : ""
+                  }`}
+                  aria-label="Tùy chọn người dùng"
+                  title="Tùy chọn"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem
+                  onClick={logout}
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Đăng xuất
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </aside>

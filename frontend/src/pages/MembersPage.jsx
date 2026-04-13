@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import userApi from "@/api/userApi";
+import projectApi from "@/api/projectApi";
 
 const AVATAR_COLORS = [
   "bg-blue-500",
@@ -259,6 +260,9 @@ function UserActions({ user, currentUserId, onRoleChange, onStatusChange, onDele
 // ─── Members Page ────────────────────────────────────────────
 export default function MembersPage() {
   const { user: currentUser } = useAuth();
+  const role = currentUser?.role;
+  const isAdmin = role === "Admin";
+  const isDirector = role === "Director";
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -282,9 +286,53 @@ export default function MembersPage() {
     }
   }, []);
 
+  const fetchDirectorMembers = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      // Director không có quyền GET /users, nên lấy thành viên bằng cách:
+      // 1) Lấy các dự án mà director truy cập được
+      // 2) Với mỗi dự án, lấy danh sách members của dự án đó
+      const projectsRes = await projectApi.getAll();
+      const projects = projectsRes.data.data || [];
+
+      const memberMap = new Map(); // userId -> user
+      for (const p of projects) {
+        const membersRes = await projectApi.getMembers(p.id);
+        const members = membersRes.data.data || [];
+        for (const m of members) {
+          if (!memberMap.has(m.id)) {
+            memberMap.set(m.id, {
+              id: m.id,
+              full_name: m.full_name,
+              email: m.email,
+              role: m.role,
+              // Những field này có thể không có trong GET /projects/:id/members
+              status: m.status,
+              created_at: m.created_at,
+              is_online: m.is_online,
+              avatar_path: m.avatar_path,
+            });
+          }
+        }
+      }
+
+      setUsers(Array.from(memberMap.values()));
+    } catch (err) {
+      setError(err.response?.data?.message || "Không thể tải danh sách thành viên của công ty");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    if (isDirector) {
+      fetchDirectorMembers();
+    } else {
+      fetchUsers();
+    }
+  }, [fetchUsers, fetchDirectorMembers, isDirector]);
 
   const showToast = (message, type = "success") => setToast({ message, type });
 
@@ -363,13 +411,15 @@ export default function MembersPage() {
               Quản lý quyền truy cập và vai trò của thành viên trong hệ thống.
             </p>
           </div>
-          <Button
-            className="gap-2 bg-blue-600 hover:bg-blue-700"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Thêm nhân viên
-          </Button>
+          {isAdmin && (
+            <Button
+              className="gap-2 bg-blue-600 hover:bg-blue-700"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Thêm nhân viên
+            </Button>
+          )}
         </div>
 
         {/* Search & Count */}
@@ -400,7 +450,12 @@ export default function MembersPage() {
           <div className="flex flex-col items-center justify-center py-20">
             <AlertCircle className="h-10 w-10 text-red-400" />
             <p className="mt-3 text-sm text-red-500">{error}</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={fetchUsers}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={isDirector ? fetchDirectorMembers : fetchUsers}
+            >
               Thử lại
             </Button>
           </div>
@@ -426,15 +481,21 @@ export default function MembersPage() {
                     <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                       Vai trò
                     </th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Trạng thái
-                    </th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Ngày tạo
-                    </th>
-                    <th className="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Thao tác
-                    </th>
+                    {isAdmin && (
+                      <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Trạng thái
+                      </th>
+                    )}
+                    {isAdmin && (
+                      <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Ngày tạo
+                      </th>
+                    )}
+                    {isAdmin && (
+                      <th className="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Thao tác
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -461,27 +522,31 @@ export default function MembersPage() {
                             {roleCfg.label}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4">
-                          {u.status === "Active" && (
-                            <Badge variant="success">Hoạt động</Badge>
-                          )}
-                          {u.status === "Inactive" && (
-                            <Badge variant="error">Đã khóa</Badge>
-                          )}
-                          {u.status === "Pending" && (
-                            <Badge variant="warning">Đang mời</Badge>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-slate-500">{formatDate(u.created_at)}</td>
-                        <td className="px-6 py-4 text-right">
-                          <UserActions
-                            user={u}
-                            currentUserId={currentUser?.id}
-                            onRoleChange={handleRoleChange}
-                            onStatusChange={handleStatusChange}
-                            onDelete={handleDeleteClick}
-                          />
-                        </td>
+                        {isAdmin && (
+                          <>
+                            <td className="px-6 py-4">
+                              {u.status === "Active" && (
+                                <Badge variant="success">Hoạt động</Badge>
+                              )}
+                              {u.status === "Inactive" && (
+                                <Badge variant="error">Đã khóa</Badge>
+                              )}
+                              {u.status === "Pending" && (
+                                <Badge variant="warning">Đang mời</Badge>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-slate-500">{formatDate(u.created_at)}</td>
+                            <td className="px-6 py-4 text-right">
+                              <UserActions
+                                user={u}
+                                currentUserId={currentUser?.id}
+                                onRoleChange={handleRoleChange}
+                                onStatusChange={handleStatusChange}
+                                onDelete={handleDeleteClick}
+                              />
+                            </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })}
@@ -493,11 +558,13 @@ export default function MembersPage() {
       </div>
 
       {/* Create Modal */}
-      <CreateUserModal
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onSuccess={handleCreateSuccess}
-      />
+      {isAdmin && (
+        <CreateUserModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onSuccess={handleCreateSuccess}
+        />
+      )}
 
       {/* Delete confirm dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
